@@ -240,5 +240,30 @@
       "list_price_inr": 3373.0,
       "launch_date": "2024-12-23"
     }
+  },
+  "decision": {
+    "recommended_top_share": 0.25,
+    "score_cutoff_for_call": 0.13650268998194356,
+    "capacity_options": {
+      "2%": 0.5083367971965665,
+      "5%": 0.35832211144019854,
+      "10%": 0.24710052818228148,
+      "15%": 0.19432572470865433,
+      "20%": 0.16049407012564057,
+      "25%": 0.13650268998194356,
+      "30%": 0.11834848448766053,
+      "40%": 0.09015582048924796,
+      "50%": 0.07013472045909871
+    },
+    "costs": {
+      "return_cost": 1150,
+      "call_cost": 45,
+      "prevention": 0.35,
+      "cancel": 0.12,
+      "margin_rate": 0.25,
+      "count_margin_in_call": false
+    },
+    "orders_per_month_in_export": 699,
+    "rule": "call orders whose calibrated risk is at or above the cutoff for the chosen capacity; never hold"
   }
 }

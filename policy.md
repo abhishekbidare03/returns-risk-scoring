@@ -104,14 +104,27 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 | Pre-dispatch confirmation call | **₹45** per completed call | Ops-policy §4 |
 | Call effect | prevents **~35%** of returns on called orders | Ops-policy §7 (spring pilot). No dip is visible in the data (Mar–May 2026: 11.2/12.0/11.2%), so we use the policy figure |
 | Hold > 24 h | **~12%** of held orders are cancelled by the customer | Ops-policy §7 |
-| Margin lost on a cancelled good order | Not in the pack; **the conclusion doesn't depend on it**: for every order worth calling, calls beat holds in every family at any margin ≥ 10% (notebook 02 §10e, `evidence/margin_crossover_15pct.csv`). Phase 5 still states the assumption used for ₹ totals | Not in the pack |
+| Margin lost on a cancelled good order | Not in the pack; **the conclusion doesn't depend on it**: for every order worth calling, calls beat holds in every family at margins ≥ 15%; at 10%, 2 of 10,504 orders have a sliver below the 13.7% operating cutoff (notebook 02 §10e, corrected in Phase 5, `evidence/margin_crossover_15pct.csv`). Phase 5 still states the assumption used for ₹ totals | Not in the pack |
+| **Margin used for ₹ totals** | **25% of order value** (stated assumption; 15% / 35% sensitivity). The call-vs-hold conclusion holds at every margin tested | Phase 5 (`notebooks/04_decision_economics.ipynb`) |
+| Headline call value | **Conservative**: the margin a prevented return keeps is *not* counted (counting it makes calls ~5× more valuable) | Phase 5 |
 | Model cost per order | **₹0** (local model, local reasons, no API) | Farhan's condition |
 
 ## 7. Decision rules
-_To be completed in Phase 5._ Planned shape: call the top X% of orders the team can handle; don't hold.
+
+*Set in Phase 5 (2026-10-06) on the walk-forward out-of-fold predictions (holdout not used); stored in `models/model_meta.json` → `decision`.*
+
+| Rule | Value | Evidence |
+|---|---|---|
+| **Action** | **Call** orders whose calibrated risk is at or above the cutoff for the chosen capacity. **Never hold.** | A hold is never better than a call for any order; holding the top 10% loses ~₹10,400/month vs calling it +₹8,300 |
+| **Default capacity** | **Top 25% of orders → risk cutoff 13.7%** (~6 calls/day at the export's ~700 orders/month) | Declared rule: largest top-X% whose marginal band is still net-positive (band 25–30% precision 10.0% < 11.2% break-even) |
+| Capacity options | top 5% → 35.8% · 10% → 24.7% · 15% → 19.4% · 20% → 16.0% · 30% → 11.8% | Ritu's team picks X; smaller X keep the highest return per call |
+| Floor | Never call below the conservative break-even (11.2% at ₹1,150) | Test `test_saved_decision_is_consistent` |
+| At ₹600 per return | Same rule gives top 15% (still net-positive) | Sensitivity |
+| Robustness | At top 25%, calls beat holds in **18/18** scenarios (return ₹600/₹1,150 × prevention 25/35/45% × margin 15/25/35%); call net-positive in 15/18 (negatives: ₹600 with 25% prevention) | Notebook 04 §4 |
 
 ## 8. Shield rule
-_To be completed in Phase 5._ Planned shape: "call, don't hold" for everyone; Shield is an extra reason never to hold. Shield = 22% of orders, 36% of returns, return rate 18.6% vs 9.4%.
+
+**"Call, don't hold" applies to everyone; Shield is one more reason never to hold.** A risk model flags Shield members at about twice their share (42–49% of flagged orders vs 22% of all orders) without bias: flagged Shield and non-Shield orders return at similar rates (29.6% vs 25.7% at top 25%). Holding them would cancel ~9 Shield orders a month from the highest-lifetime-value segment; a call puts no order at risk.
 
 ## 9. Model governance
 _To be completed in Phase 6/7._

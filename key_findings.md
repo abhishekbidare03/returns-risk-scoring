@@ -189,8 +189,10 @@ Evidence: `notebooks/02_eda.ipynb` §10 (56 cells, executed); `evidence/margin_c
 | **Price represented once: `family` + `discount_pct`**; `order_value_inr` economics-only; SKU tier a candidate | Value = list × qty × (1 − discount); overlapping columns split one effect across LR coefficients and reasons; within-family value is flat | Order value as the feature (mixes family and discount into one number, hiding which drives the reason) |
 | **Gift = serious candidate**; rare flags judged by effect size, not AUC (policy §5.6) | Real, stable +5.5 pts effect that AUC hides at 7% prevalence | Drop gift on its AUC of 0.50–0.53 |
 | Address missing, qty: weak candidates (no evidence of an effect) | Intervals include zero | - |
-| **Margin resolved: for every order worth acting on, calls beat holds in every family at any reasonable margin (≥ 10%)** | Crossover below call break-even everywhere | Per-family caveat in the memo (no longer needed) |
+| **Margin resolved: for every order worth acting on, calls beat holds in every family at margins ≥ 15%; at 10% only 2 of 10,504 orders have a sliver, below the operating cutoff** (corrected in Phase 5) | Crossover below call break-even everywhere | Per-family caveat in the memo (no longer needed) |
 | Phase 8: if note and address features are dropped, remove `delivery_note` and `delivery_pincode` from the API inputs (privacy improvement) | Data minimisation | Accept and ignore them |
+
+*(Corrected in Phase 5: exact count, no rounding. At **≥ 15% margin no order** has a window where a hold beats a paying call (true accounting). At **10% margin, 2 of 10,504 orders** (19 under conservative accounting), the cheapest room heaters, have a narrow window up to 12.0% (13.6%) risk where a hold edges a call by a few rupees, all **below the 13.7% operating cutoff**, so the policy never meets them. The earlier "100.0%" was rounding.)*
 
 **Implication for Phase 5:** under the true accounting, calling pays from p ≈ 3–9% (depending on order value), which is below the 11.4% base rate. **Call capacity, not break-even, is the binding limit**, which supports "call the top X% the team can handle".
 
@@ -294,6 +296,47 @@ Holdout calibration: mean predicted 11.0% vs actual 11.5%; the top decile is 40.
 
 ---
 
+## Phase 5 - Decision economics (2026-10-06)
+
+Evidence: `notebooks/04_decision_economics.ipynb`, `src/kestrel/economics.py`, `tests/test_economics.py`; figures `evidence/figures/04_call_vs_hold_net.png`, `04_call_capacity.png`. Data: walk-forward out-of-fold predictions of the chosen model (6,365 orders, Jul 2025 – Mar 2026), calibrated (mean predicted 11.2% = actual 11.2%). ₹ figures use **what actually happened** to those orders. **The holdout was not used.** Monthly figures use the export's volume (~699 orders/month); per-1,000-order figures scale to any volume.
+
+**Assumptions:** return ₹1,150 (₹600 sensitivity); call ₹45, prevents 35%; hold → 12% cancel; **margin 25% of order value (assumption, 15/35% sensitivity)**; headline call value ignores the margin a prevented return keeps (conservative). **Declared before computing:** default capacity = largest top-X% whose marginal band is still net-positive.
+
+**Results**
+| Policy (realised, walk-forward folds) | Orders actioned | Precision | Returns avoided | Good orders lost | Net ₹/month | Net ₹ per 1,000 orders |
+|---|---|---|---|---|---|---|
+| Ship everything (today) | 0 | - | 0 | 0 | 0 | 0 |
+| **Ritu's ask: hold top 10%** | 10% | 41% | 31 | 45 | **−10,400** | −14,800 |
+| Hold top 20% | 20% | 31% | 47 | 106 | −26,500 | −37,900 |
+| Call top 10% | 10% | 41% | 91 | 0 | +8,300 | +11,900 |
+| **Call top 25% (recommended default)** | 25% | 27% | 16.7/month | 0 | **+11,400** | **+16,300** |
+| Call everyone above break-even (11.2%) | 32% | 24% | 169 | 0 | +11,200 | +16,000 |
+
+- **Break-evens:** a call pays above **11.2%** risk (₹1,150) or 21.4% (₹600); counting kept margin, a median order pays from 5.7%. **32% of orders** are above 11.2%, so capacity, not break-even, binds.
+- **Holds never win:** for 0.00% of orders is a hold better than a call; a hold beats doing nothing for only 1.8%. Holding loses because the cancelled good orders are disproportionately high-value (robot vacuums, purifiers dominate the top decile), and their lost margin outweighs ₹1,150 × 12% of the returns.
+- **Capacity curve:** value climbs to ~10–15% of orders, flattens at 20–30%, and the 25–30% band is already slightly negative (band precision 10.0%). **Top 10% earns 73% of the top-25% value with 40% of the calls; top 5% earns 50%.**
+- **Recommended default: top 25%** (risk ≥ **13.7%**): ~175 calls/month, ~6/day; 27% of called orders would otherwise return (2.4× base rate); covers **61% of all returns**; avoids ~17 returns/month; **net ~₹11,400/month = ₹16,300 per 1,000 orders**. At ₹600: same rule → top 15%, ₹2,900/month. Counting kept margin: ~₹61,400/month.
+- **Sensitivity (top 25%):** calls beat holds in **18/18** scenarios; call net-positive in **15/18** (the 3 negatives: ₹600 per return with only 25% prevention). Holds lose ₹18,600–55,400/month in every scenario.
+- **Shield:** 42–49% of flagged orders are Shield vs 22% overall, with similar precision (29.6% vs 25.7% at top 25%), so there's no bias, just higher risk. Holding at top 25% would cancel ~9 Shield orders a month. By family, robot vacuums (48% flagged) and purifiers (39%) dominate the call list.
+
+**Correction to Phase 2 §10e (found by a Phase 5 test):** the margin claim was stated "at any margin ≥ 10%". The exact count: at **≥ 15% margin, no order** has a window where a hold beats a paying call. At **10%**, **2 of 10,504** orders (19 under conservative accounting), the cheapest room heaters, have a narrow window up to 12.0% (13.6%) risk, all **below the 13.7% operating cutoff**. The earlier "100.0%" was rounding. Corrected in `key_findings.md`, `policy.md`, `plan.md` and notebook 02's reading; the test now asserts the precise claim.
+
+**Decisions**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| **Call, never hold** | Holds lose money at every capacity and in every sensitivity scenario | Ritu's hold (−₹10,400/month at top 10%); hybrid call+hold (holds never beat calls for any order) |
+| **Default top 25% (cutoff 13.7%)**, with a capacity menu (5–30%) | Declared rule; capacity unknown, so Ritu's team picks X | "Call everyone above 11.2%" (32% of orders, no extra value: band 25–30% is negative) |
+| Headline ₹ conservative (kept margin not counted); 25% margin for hold losses | Under-promise; the conclusion doesn't depend on it | Count kept margin in the headline (5× larger, rests on an unverified margin) |
+| ₹ judged on realised outcomes, not predicted probabilities | Doesn't depend on calibration | Expected values only |
+| Decision stored in `model_meta.json` (`decision`: cutoff, capacity menu, costs) | The API reads one source of truth | Hard-code the cutoff in the API |
+| Shield: same "call, don't hold" rule | No bias in precision; a call puts no order at risk | Exempt Shield from calls (would skip 42–49% of the best-value calls) |
+
+**For the memo (Phase 9):** the number for the board is *"Of the orders we call, about 1 in 4 would otherwise have come back (2.4× normal), and those orders hold 61% of all returns"*, not "95% accuracy". The rupees: ~₹16,300 net per 1,000 orders (conservative), vs ~−₹14,800 for holding the top 10%.
+
+**Next step:** Phase 6, evidence and error analysis (backtest report, segment performance incl. seen/unseen and `prior_orders = 0`, gift-order calibration on OOF as a known limitation with its ₹ effect, history-coefficient note, failure gallery, expected-score write-up).
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
@@ -305,3 +348,5 @@ Holdout calibration: mean predicted 11.0% vs actual 11.5%; the top decile is 40.
 | 2026-10-06 | **v2.3:** selection only on walk-forward folds ending Mar 2026; ablation rule fixed in advance; metro preferred within noise; price = family + discount (order value economics-only); gift a serious candidate; §5a margin resolved; Phase 8 neutral location wording + data minimisation | User sign-off on Phase 2 + Phase 2 §10 evidence (city gap halves within delivery bands; within-family value flat; gift +5.5 pts; crossover < call break-even) |
 | 2026-10-06 | **v2.4:** Phase 4 rules fixed before running (noise threshold, LR-vs-HGB rule, no class weighting, declared grid, run order, calibration-fold criterion, unknown-value averaging, one-time holdout); gift/qty defaults reported as fallbacks | User instructions before Phase 4 |
 | 2026-10-06 | **v2.5:** holdout in a separate notebook (03b) run once; final all-data model saved in Phase 4 (Phase 7 = scoring + checks); API inputs reduced to the 7 fields the model uses (data minimisation triggered); history reasons grouped | Phase 4 results: LR on 9 core features, no candidate kept; correlated history coefficients |
+| 2026-10-06 | **v2.6:** Phase 6 adds a gift-order calibration check (OOF) as a known limitation and the history-coefficient note | User notes at Phase 4 sign-off |
+| 2026-10-06 | **v2.7:** decision stored in `model_meta.json` (`decision`); default capacity top 25% (cutoff 13.7%); API `recommended_action` = CALL at/above the cutoff, else SHIP, never HOLD; margin claim corrected (≥ 15%; 2 orders at 10%) | Phase 5 results; a Phase 5 test exposed rounding in the Phase 2 claim |

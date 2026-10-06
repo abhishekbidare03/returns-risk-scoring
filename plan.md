@@ -274,7 +274,7 @@ Notebook: `04_decision_economics.ipynb`, code in `src/kestrel/economics.py`
 
 - Call break-even: **p > 11.2%** at ₹1,150 using the conservative figure. Because the true saving includes margin, **11.2% is an upper bound** on the real break-even. At ₹600 it is p > 21.4%.
 - Call − hold = 264.5·p − 45 + 0.12·(1−p)·m, which is positive for every p **when m > ₹375** (₹45 ÷ 0.12). Holds also carry handling and goodwill costs this sum ignores, so the condition is conservative.
-- **Settled in Phase 2 §10e:** for every order worth calling, calls beat holds in every family at any margin ≥ 10% (worst case: the cheapest room heater, crossover 9.9% vs call break-even 10.0%). Under the true accounting, calling pays from p ≈ 3–9%, below the base rate, so **call capacity is the binding limit**.
+- **Settled in Phase 2 §10e:** for every order worth calling, calls beat holds in every family at margins ≥ 15% (worst case at 15%: the cheapest room heater, crossover 9.9% vs call break-even 10.0%); at 10%, 2 of 10,504 orders have a sliver below the 13.7% operating cutoff (corrected in Phase 5). Under the true accounting, calling pays from p ≈ 3–9%, below the base rate, so **call capacity is the binding limit**.
 
 Steps:
 1. **Margin assumption (the one open decision, see §5a):** check the median order value overall and by family. Apply 15 / 25 / 35% margin and show what share of orders clear the ₹375 condition. If 15% of a typical order is well above ₹375, "calls beat holds" is safe under any reasonable margin. If cheap families (e.g. fans, small appliances) fall below it, state the conclusion per family; that's worth one line in the memo.
@@ -299,6 +299,8 @@ Contents:
 2. **Stability:** metric per month and per walk-forward fold (spread, worst month).
 3. **Segment performance:** by family, channel and Shield, plus **two separate customer splits**: seen vs unseen in train (31.5% of test unseen), **and** `prior_orders = 0` vs > 0 (27.9% of test). These are different groups, so each is reported on its own. Where the model is weak (e.g. first-time customers with no history). *(Added 2026-10-06, Phase 1 close-out.)*
 4. **Calibration:** predicted vs actual return rate per score decile.
+   - **Gift orders (known limitation, added 2026-10-06):** the model has no gift feature, so check calibration for gift orders on the **walk-forward out-of-fold predictions (not the holdout)**: predicted vs actual return rate for gift vs non-gift, and the rough ₹ effect of the under-prediction (missed calls × value per prevented return). Record it as a known limitation.
+   - **History coefficients:** one line explaining that the negative coefficient on prior return rate is collinearity among the four history features, not an error, which is why reasons merge them.
 5. **Failure gallery:** 5–10 concrete orders the model got confidently wrong, and why (anonymised).
 6. **Leak simulation result** from Phase 4 (AUC before vs after).
 7. **Automated checks:** `pytest` results (data rules, leakage guard, parity, API contract, no-`data/` start).
@@ -345,7 +347,7 @@ Contents:
   }
   ```
   - `fallbacks_used` lists any field that fell back to "unknown"/defaults (e.g. `["shield_member", "sku → family default"]`), so the employee knows the score rests on less information.
-  - `recommended_action` reflects "call the top X% the team can handle" (the capacity cut-off from Phase 5), never "hold".
+  - `recommended_action` reflects "call the top X% the team can handle" (the capacity cut-off from Phase 5), never "hold". **(v2.7)** It reads `model_meta.json` → `decision`: CALL if calibrated risk ≥ the cutoff (default 13.7% = top 25%), else SHIP. The response also shows the capacity menu so ops can see where the order sits.
 - `GET /health`: model loaded, version, validation metrics.
 - `GET /`: serves the screen. `GET /docs`: auto Swagger, free from FastAPI.
 - Input validation via Pydantic: clear 422 messages.
@@ -418,7 +420,7 @@ The README says pack files go in `data/` **only for retraining** (`python -m kes
 
 ### 5a. Margin decision - resolved (Phase 2 §10e)
 
-**Margin on a cancelled good order.** Not in the pack. Checked by family at 10 / 15 / 25%: **for every order worth acting on, calls beat holds in every family at any reasonable margin (≥ 10%)**. The per-family table is kept as evidence (`evidence/margin_crossover_15pct.csv`). Phase 5 still states the margin used for ₹ totals (with sensitivity), but the call-vs-hold conclusion no longer depends on it.
+**Margin on a cancelled good order.** Not in the pack. Checked by family at 10 / 15 / 25%: **for every order worth acting on, calls beat holds in every family at margins ≥ 15%; at 10%, 2 of 10,504 orders have a sliver below the operating cutoff** (corrected in Phase 5). The per-family table is kept as evidence (`evidence/margin_crossover_15pct.csv`). Phase 5 still states the margin used for ₹ totals (with sensitivity), but the call-vs-hold conclusion no longer depends on it.
 
 ---
 
@@ -486,5 +488,7 @@ The README says pack files go in `data/` **only for retraining** (`python -m kes
 | 2026-10-06 | v2.3 | Selection only on walk-forward folds ending Mar 2026 (Apr–Jun used once); ablation rule fixed (≥ 2 of 3 folds; simpler set within noise); metro preferred over city within noise; price = `family` + `discount_pct` (order value economics-only); gift a serious candidate (effect size, not AUC, for rare flags); §5a margin resolved; Phase 8: neutral location wording + drop note/pincode inputs if their features are dropped | User sign-off on Phase 2 + data: city gap halves within delivery-promise bands (4.3 → 2.1 pts); within-family value flat; gift +5.5 pts [2.7, 8.3]; margin crossover < call break-even in all families (notebook 02 §10) |
 | 2026-10-06 | v2.4 | Phase 4 rules fixed before running: noise threshold ≥ 0.005 AUC on ≥ 2/3 folds; HGB only if > 0.01 mean and ≥ 2/3 folds; no class weighting/resampling; declared tuning grid; run order; monotonic HGB option; calibrator on folds 2–3 if fold 1 less confident; explicit unknown-value averaging; one-time holdout protocol; `qty`/`is_gift` defaults reported as fallbacks (gift unknown → averaged) | User instructions before Phase 4 |
 | 2026-10-06 | v2.5 | Holdout in a separate notebook `03b` run once; final all-data model saved in Phase 4 (Phase 7 = scoring + checks); API input reduced to the 7 fields the model uses; history reasons grouped | Phase 4 results: LR on 9 core features, no candidate kept; correlated history coefficients (see `key_findings.md` Phase 4) |
+| 2026-10-06 | v2.6 | Phase 6: gift-order calibration check on OOF predictions as a known limitation (with ₹ effect); collinearity note for history coefficients in the evidence | User notes at Phase 4 sign-off |
+| 2026-10-06 | v2.7 | Phase 5 decision stored in `model_meta.json`; default capacity top 25% (cutoff 13.7%); API action = CALL/SHIP from the stored cutoff; margin claim corrected to ≥ 15% (2 orders at 10%, below the cutoff) | Phase 5 results (`key_findings.md` Phase 5) |
 
 *Any later change: add a row here and a matching entry in `key_findings.md`.*
