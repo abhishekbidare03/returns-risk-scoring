@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kestrel Return Risk</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #ffffff; --ink: #1a1a19; --ink-2: #55534e; --muted: #8a8780; --line: #e4e2dc;
+    --accent: #2a78d6; --accent-ink: #ffffff;
+    --low: #1f7a4d; --low-bg: #e3f3ea; --med: #8a5a00; --med-bg: #fbefd6; --high: #b4401a; --high-bg: #fbe4da;
+    --warn-bg: #fff6e0; --warn-ink: #7a5200; --err-bg: #fde8e6; --err-ink: #9b2c1f;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413; --surface: #1d1d1b; --ink: #f2f1ec; --ink-2: #c3c1b8; --muted: #8f8d85; --line: #34332f;
+      --accent: #4b93ea; --low: #6fd3a0; --low-bg: #16301f; --med: #f0c46a; --med-bg: #33290f; --high: #ff9a72; --high-bg: #3a1d12;
+      --warn-bg: #33290f; --warn-ink: #f0c46a; --err-bg: #3a1a16; --err-ink: #ff9d8f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-x: hidden; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1080px; margin: 0 auto; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
+  header p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+  main { max-width: 1080px; margin: 0 auto; padding: 8px 16px 32px; display: grid; gap: 16px;
+         grid-template-columns: minmax(0, 380px) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 760px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  label { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4px; }
+  label small { color: var(--muted); }
+  input, select { width: 100%; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px;
+                  background: var(--bg); color: var(--ink); font: inherit; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  button { margin-top: 16px; width: 100%; padding: 10px; border: 0; border-radius: 7px; background: var(--accent);
+           color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: wait; }
+  .sample { margin-bottom: 6px; }
+  .empty { color: var(--muted); padding: 32px 0; text-align: center; }
+  .headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; }
+  .prob { font-size: 44px; font-weight: 700; letter-spacing: -0.02em; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  .Low { color: var(--low); background: var(--low-bg); }
+  .Medium { color: var(--med); background: var(--med-bg); }
+  .High { color: var(--high); background: var(--high-bg); }
+  .vs { color: var(--ink-2); font-size: 14px; }
+  .bar { position: relative; height: 8px; border-radius: 4px; background: var(--line); margin: 14px 0 4px; overflow: visible; }
+  .bar .fill { height: 100%; border-radius: 4px; background: var(--ink-2); }
+  .bar .f-Low { background: var(--low); } .bar .f-Medium { background: var(--med); } .bar .f-High { background: var(--high); }
+  .bar .tick { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--ink); }
+  .scale { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .action { margin-top: 16px; padding: 14px; border-radius: 8px; border: 1px solid var(--line); display: flex; gap: 14px; align-items: center; }
+  .action .verb { font-size: 22px; font-weight: 700; min-width: 64px; }
+  .action.CALL .verb { color: var(--high); }
+  .action.SHIP .verb { color: var(--low); }
+  .action .sub { color: var(--ink-2); font-size: 14px; }
+  .reasons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 16px; }
+  @media (max-width: 560px) { .reasons { grid-template-columns: minmax(0, 1fr); } .prob { font-size: 36px; } }
+  .reasons h3 { margin: 0 0 6px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+  .reasons ul { margin: 0; padding-left: 0; list-style: none; }
+  .reasons li { padding: 6px 0 6px 22px; position: relative; border-top: 1px solid var(--line); font-size: 14px; }
+  .reasons li:first-child { border-top: 0; }
+  .up li::before { content: "▲"; position: absolute; left: 2px; color: var(--high); font-size: 11px; top: 9px; }
+  .down li::before { content: "▼"; position: absolute; left: 2px; color: var(--low); font-size: 11px; top: 9px; }
+  .none { color: var(--muted); font-size: 14px; }
+  .notice { margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 13px; background: var(--warn-bg); color: var(--warn-ink); }
+  .notice ul { margin: 4px 0 0; padding-left: 18px; }
+  .error { background: var(--err-bg); color: var(--err-ink); }
+  footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 24px; color: var(--muted); font-size: 12px; }
+  code { font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kestrel return risk</h1>
+  <p>Score an order before dispatch. High-risk orders get a confirmation call. Orders are never held.</p>
+</header>
+
+<main>
+  <section class="card" aria-labelledby="form-h">
+    <h2 id="form-h">Order</h2>
+    <label for="sample">Load a sample order <small>(synthetic)</small></label>
+    <select id="sample" class="sample"><option value="">Choose a sample…</option></select>
+
+    <form id="form" novalidate>
+      <label for="sku">SKU</label>
+      <input id="sku" name="sku" list="skus" required placeholder="e.g. KH-AF-01" autocomplete="off">
+      <datalist id="skus"></datalist>
+
+      <div class="row">
+        <div>
+          <label for="payment_mode">Payment mode</label>
+          <select id="payment_mode" name="payment_mode">
+            <option value="cod">Cash on delivery</option>
+            <option value="prepaid_upi">Prepaid – UPI</option>
+            <option value="prepaid_card">Prepaid – card</option>
+            <option value="emi">EMI</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div>
+          <label for="shield_member">Shield member</label>
+          <select id="shield_member" name="shield_member">
+            <option value="N">No</option>
+            <option value="Y">Yes</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="promised_delivery_days">Promised delivery <small>(days)</small></label>
+          <input id="promised_delivery_days" name="promised_delivery_days" type="number" min="1" max="60" step="1" required>
+        </div>
+        <div>
+          <label for="discount_pct">Discount <small>(%)</small></label>
+          <input id="discount_pct" name="discount_pct" type="number" min="0" max="100" step="0.5" required>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="customer_prior_orders">Customer's prior orders</label>
+          <input id="customer_prior_orders" name="customer_prior_orders" type="number" min="0" step="1" required>
+        </div>
+        <div>
+          <label for="customer_prior_returns">…of which returned</label>
+          <input id="customer_prior_returns" name="customer_prior_returns" type="number" min="0" step="1" required>
+        </div>
+      </div>
+
+      <button id="go" type="submit">Score order</button>
+    </form>
+  </section>
+
+  <section class="card" aria-live="polite" aria-labelledby="res-h">
+    <h2 id="res-h">Result</h2>
+    <div id="result"><p class="empty">Fill in an order or load a sample, then score it.</p></div>
+  </section>
+</main>
+
+<footer id="foot">Model runs locally. No external API, no AI service, nothing stored.</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const FIELDS = ["sku", "payment_mode", "promised_delivery_days", "discount_pct",
+                "customer_prior_orders", "customer_prior_returns", "shield_member"];
+let SAMPLES = [], CUTOFF = 0.1365, ORDER_ID = null;
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const pct = (p) => (p * 100).toFixed(p < 0.1 ? 1 : 0) + "%";
+const pct1 = (p) => (p * 100).toFixed(1) + "%";
+const inr = (v) => "₹" + Math.abs(v).toLocaleString("en-IN", {maximumFractionDigits: 0});
+
+async function init() {
+  try {
+    const [h, s] = await Promise.all([fetch("/health").then(r => r.json()), fetch("/samples").then(r => r.json())]);
+    CUTOFF = h.call_cutoff;
+    $("skus").innerHTML = h.skus.map(k => `<option value="${esc(k)}">`).join("");
+    $("foot").textContent = `Model ${h.model_version} · logistic regression · call at ≥ ${pct1(CUTOFF)} risk · runs locally, no external API, no AI service, nothing stored.`;
+    SAMPLES = s;
+    $("sample").insertAdjacentHTML("beforeend", s.map((x, i) => `<option value="${i}">${esc(x.label)}</option>`).join(""));
+    const pre = new URLSearchParams(location.search).get("sample");          // e.g. /?sample=1 opens sample 1
+    if (pre && SAMPLES[Number(pre) - 1]) { $("sample").value = Number(pre) - 1; $("sample").dispatchEvent(new Event("change")); }
+  } catch (e) { $("result").innerHTML = `<div class="notice error">Could not reach the service: ${esc(e.message)}</div>`; }
+}
+
+$("sample").addEventListener("change", (e) => {
+  const s = SAMPLES[e.target.value]; if (!s) return;
+  ORDER_ID = s.order.order_id || null;
+  FIELDS.forEach(f => { if (s.order[f] !== undefined) $(f).value = s.order[f]; });
+  $("form").requestSubmit();
+});
+$("form").addEventListener("input", () => { ORDER_ID = null; });
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {};
+  FIELDS.forEach(f => { const v = $(f).value.trim(); if (v !== "") body[f] = $(f).type === "number" ? Number(v) : v; });
+  if (ORDER_ID) body.order_id = ORDER_ID;
+  $("go").disabled = true;
+  try {
+    const r = await fetch("/score", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    const data = await r.json();
+    r.ok ? render(data) : renderError(data);
+  } catch (err) { renderError({problems: [{field: "network", problem: err.message}]}); }
+  finally { $("go").disabled = false; }
+});
+
+function renderError(d) {
+  const items = (d.problems || []).map(p =>
+    `<li><b>${esc(p.field)}</b>: ${esc(p.problem)}${p.allowed_values ? ` <br><small>Allowed: ${esc(p.allowed_values)}</small>` : ""}</li>`).join("");
+  $("result").innerHTML = `<div class="notice error"><b>${esc(d.error || "Could not score this order")}</b><ul>${items}</ul></div>`;
+}
+
+function render(d) {
+  const p = d.return_probability, w = Math.min(p / 0.6, 1) * 100, t = Math.min(CUTOFF / 0.6, 1) * 100;
+  const list = (xs, cls, empty) => xs.length ? `<ul class="${cls}">${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">${empty}</p>`;
+  const callLine = d.call_value_inr > 0
+    ? `Expected net value of a call: <b>${inr(d.call_value_inr)}</b> (₹45 call vs. a ₹1,150 return avoided 35% of the time).`
+    : `A call would cost more than it is expected to save (${inr(d.call_value_inr)} net).`;
+  const notes = [];
+  if (d.fallbacks_used.length) notes.push(`<div class="notice"><b>Scored with less information</b><ul>${d.fallbacks_used.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`);
+  if (d.ignored_fields && d.ignored_fields.length) notes.push(`<div class="notice"><b>Ignored fields</b><ul>${d.warnings.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`);
+  $("result").innerHTML = `
+    ${d.order_id ? `<div class="vs">${esc(d.order_id)} · ${esc(d.family)}</div>` : `<div class="vs">${esc(d.family)}</div>`}
+    <div class="headline">
+      <span class="prob">${pct(p)}</span>
+      <span class="chip ${d.risk_band}">${d.risk_band} risk</span>
+      <span class="vs">${esc(d.vs_typical)}</span>
+    </div>
+    <div class="bar" role="img" aria-label="Return probability ${pct(p)}; call threshold ${pct1(CUTOFF)}">
+      <div class="fill f-${d.risk_band}" style="width:${w}%"></div><div class="tick" style="left:${t}%"></div>
+    </div>
+    <div class="scale"><span>0%</span><span>call at ≥ ${pct1(CUTOFF)}</span><span>60%+</span></div>
+    <div class="action ${d.recommended_action}">
+      <span class="verb">${d.recommended_action}</span>
+      <span class="sub">${esc(d.note)}<br>${callLine}</span>
+    </div>
+    <div class="reasons">
+      <div><h3>Raising the risk</h3>${list(d.reasons_raising, "up", "Nothing stands out as raising the risk.")}</div>
+      <div><h3>Lowering the risk</h3>${list(d.reasons_lowering, "down", "Nothing stands out as lowering the risk.")}</div>
+    </div>
+    ${notes.join("")}`;
+}
+init();
+</script>
+</body>
+</html>

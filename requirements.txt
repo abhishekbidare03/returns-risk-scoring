@@ -1,5 +1,5 @@
-# Pinned, tested on Python 3.12.3 (Windows 11). Pure pip wheels - no compiler needed.
-# Core: model + service
+# Service, training and tests. Python 3.12 or 3.13 (numpy 2.5 and scipy 1.18 need >= 3.12).
+# Pinned; pure pip wheels - no compiler needed. Notebooks need requirements-dev.txt instead.
 numpy==2.5.3
 pandas==3.0.6
 scikit-learn==1.9.1
@@ -8,10 +8,6 @@ joblib==1.6.0
 fastapi==0.142.2
 uvicorn[standard]==0.54.0
 pydantic==2.13.5
-# Analysis, evidence and tests
-matplotlib==3.11.2
-jupyter==1.1.1
-ipykernel==7.4.0
 pytest==9.1.1
 httpx==0.28.1
 # This project's own package (src/kestrel)

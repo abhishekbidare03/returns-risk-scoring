@@ -88,7 +88,7 @@ Chart: `figures/05_segment_auc.png`.
 
 ## 6. Automated checks
 
-`python -m pytest`: **76 passed**:
+`python -m pytest`: **102 passed** (76 at Phase 6; the API and prediction tests were added in Phases 7–8):
 - **Cleaning rules** on the real pack: dedupe → 10,504 orders, Oct-2025 paise fix, dates, IDs match the sample submission.
 - **Leakage guard:** no banned column is an input or a feature. Injecting `REVERSE_PICKUP`, a pickup date or the label leaves the features unchanged. The feature code reads no files.
 - **Privacy:** gate-code digits and free text never survive into the features.
@@ -96,11 +96,34 @@ Chart: `figures/05_segment_auc.png`.
 - **Unknown values:** an unknown Shield, payment mode or family scores strictly between its known versions (Shield = the exact 22/78 weighted average) and is reported as a fallback.
 - **Economics:** formulas, break-evens (11.2%, 21.4%), "calls beat holds" (true accounting, margin ≥ 15%; conservative accounting at the 13.7% cutoff), and the stored decision never calls below break-even.
 
-## 7. Reproduce
+## 7. Service behaviour (Phase 8)
+
+The service (`app/main.py`, `src/kestrel/service.py`) loads only `models/model.joblib` + `models/model_meta.json`. No `data/`, no API key, no LLM, and request bodies are never logged or stored.
+
+| Situation | What the service does | Test |
+|---|---|---|
+| Valid order (7 fields) | Probability, band (Low < 7% / Medium / **High ≥ 13.7% = CALL**), "× typical", CALL/SHIP (never HOLD), ₹ value of a call, 2–3 reasons raising and 1 lowering the risk | `test_valid_order` |
+| Required field missing (`sku`, delivery days, discount, prior orders/returns) | **422** naming the field | `test_missing_required_field_is_422` (5 cases) |
+| Invalid value (negative days, discount > 100, text for a number, 4.5 days, returns > orders) | **422** with the reason | `test_invalid_value_is_422` (5 cases) |
+| Category typo (`payment_mode: "upi"`, `shield_member: "maybe"`) | **422 listing the allowed values** | `test_category_typo_lists_allowed_values` |
+| Shield missing or `"unknown"` | Scored as the training-weighted average (22% Shield): strictly between the Y and N scores; listed in `fallbacks_used`; no Shield reason given | `test_unknown_or_missing_shield_falls_back` |
+| Payment mode missing or `"unknown"` | Average over the payment mix; listed in `fallbacks_used` | `test_unknown_or_missing_payment_falls_back` |
+| Unknown SKU | Family from the SKU code (`KH-AF-09` → Air Fryer) or the family average if unreadable; listed | `test_unknown_sku_falls_back` |
+| `COD`, `true` instead of `cod`, `Y` | Normalised; same score | `test_case_and_bool_normalisation` |
+| Extra or post-dispatch fields (`delivery_note`, `delivery_pincode`, `pickup_scheduled_at`, `last_service_event_type`, `city`) | **Ignored**: score unchanged, names listed in `ignored_fields` with why; values never echoed (a gate code sent in a note doesn't appear in the response) | `test_extra_and_banned_fields_ignored_and_not_echoed` |
+| `GET /health`, `GET /`, `GET /samples` | Model version, cutoff, validation AUCs, `llm: none`; the screen; 7 synthetic samples with no personal fields | `test_health`, `test_page_and_samples` |
+| Parity | API score = `predict.py` score for 60 test orders sent as JSON; = batch score for every sample | `test_api_equals_predict_py`, `test_samples_api_equals_batch_scoring` |
+| Never reads `data/` | Service and app source contain no data access | `test_service_never_reads_data_dir` |
+
+**Reasons** are logistic-regression contributions relative to the average order. The four correlated customer-history features are summed into one reason, and only effects of at least 0.10 on the log-odds (about 10% change in the odds) become sentences. Wording is neutral and plain, e.g. "Cash-on-delivery orders are returned more often", "Longer delivery promise than usual (9 days; typical 5)", "Shield members return more often; returns are free for them".
+
+**API test results:** 25 API tests pass (102 in the whole suite). **Clean-machine test:** passed on a fresh copy without `data/` using Python 3.13, after one fix (Jupyter moved to `requirements-dev.txt` because of Windows long paths); see `clean_machine_test.md`.
+
+## 8. Reproduce
 
 ```
-pip install -r requirements.txt          # Python 3.11/3.12
-python -m pytest                         # 76 tests (data-dependent ones skip without data/)
+pip install -r requirements-dev.txt      # Python 3.12/3.13; requirements.txt alone is enough for the service
+python -m pytest                         # 102 tests (data-dependent ones skip without data/)
 python -m kestrel.train                  # retrain from data/ -> identical models/model.joblib
 cd notebooks && jupyter nbconvert --to notebook --execute --inplace 01_data_audit.ipynb 02_eda.ipynb 03_modeling.ipynb 04_decision_economics.ipynb 05_error_analysis.ipynb
 # 03b_holdout_and_final.ipynb is the one-time holdout run - read it, don't re-execute it

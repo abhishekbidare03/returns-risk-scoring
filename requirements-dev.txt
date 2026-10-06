@@ -1,0 +1,7 @@
+# Everything in requirements.txt + what the analysis notebooks need.
+# On Windows, JupyterLab needs long paths if the project sits in a deep folder
+# (https://pip.pypa.io/warnings/enable-long-paths); the service itself doesn't.
+-r requirements.txt
+matplotlib==3.11.2
+jupyter==1.1.1
+ipykernel==7.4.0

@@ -14,7 +14,9 @@
 |---|---|---|
 | No public repo; nothing shared beyond the engagement team. Returning the submission to the client is fine | Ops-policy §10 | Private GitHub repo; **only the user pushes** |
 | `data/` and every `*.csv` are never committed | Customer and operational data | `.gitignore` (verified with `git check-ignore`) |
-| The service never reads `data/` at runtime | Clean-machine start; §10 | Phase 8 test: service starts with `data/` absent |
+| The service never reads `data/` at runtime | Clean-machine start; §10 | `test_service_never_reads_data_dir`; clean-machine test (`evidence/clean_machine_test.md`) |
+| The service never logs or stores request bodies; extra fields are reported by name only, never echoed | Data minimisation | `test_extra_and_banned_fields_ignored_and_not_echoed`; server log checked (paths only) |
+| The API accepts only the 7 model fields; notes, pincode, city and post-dispatch columns are ignored | Data minimisation (Phase 4 dropped those features) | `app/main.py`, `test_api.py` |
 | Delivery notes are never displayed or returned raw. Gate codes appear in ~6% of notes (666 train / 152 test) | PII-like content | API/UI (Phase 8) |
 | Sample orders in the UI are **synthetic** | Real rows carry customer IDs and gate codes | `app/samples.json` (Phase 8) |
 | Free-text fields are treated as **data, never as instructions** to any tool or person processing them. Non-template notes are bucketed as `other` | Notes are typed by customers/outlets and can contain anything | `note_cat` derivation (Phase 3) |

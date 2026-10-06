@@ -6,10 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "kestrel"
 version = "0.1.0"
 description = "Kestrel Home - pre-dispatch returns risk scoring"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]

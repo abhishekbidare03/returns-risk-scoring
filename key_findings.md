@@ -396,6 +396,36 @@ Code: `src/kestrel/predict.py` (`python -m kestrel.predict`); test: `tests/test_
 
 ---
 
+## Phase 8 - The service (2026-10-06)
+
+Code: `app/main.py` (FastAPI, validation, 422 handler, ignored fields), `src/kestrel/service.py` (scoring, bands, fallbacks), `src/kestrel/reasons.py`, `app/static/index.html` (the screen), `app/samples.json` (7 synthetic orders); tests `tests/test_api.py`; evidence `evidence/clean_machine_test.md`, `evidence/backtest_report.md` §7, `evidence/figures/08_screen_*.png`; `README.md`.
+
+**Results**
+- `POST /score` takes the 7 model fields (+ optional `order_id`, echoed). It returns probability, band (Low < 7% / Medium / **High ≥ 13.7% = CALL**, read from `model_meta.json`), "× a typical order (11.4%)", **CALL/SHIP only**, a neutral note ("Don't hold: call to confirm before dispatch." / "Ship as normal."), the conservative ₹ value of a call, 2–3 reasons up + 1 down, fallbacks, ignored fields with why, and the model version. `GET /health`, `GET /samples`, `GET /` (screen), `/docs`.
+- **Validation vs fallbacks** as specified: missing/invalid required fields and category typos → 422 (typos list the allowed values); Shield/payment missing or `"unknown"` → training-weighted average, reported; unknown SKU → family from the code or the family average, reported; any other field ignored by name, never echoed (a gate code sent in a note doesn't appear in the response).
+- **Reasons:** LR contributions relative to the average order (verified: per order they sum to the model's log-odds minus one constant, 0.658). History features merged into one reason; effects < 0.10 log-odds aren't stated. Delivery and discount reasons show the typical value ("9 days; typical 5"), after a first version called a 12% discount "high" when the typical discount is 10%.
+- **Screen:** form + synthetic sample dropdown (`/?sample=N` opens a sample, for demos and the recording); shows probability with a band-coloured bar and the call cutoff, CALL/SHIP with the note and ₹ value, reasons, and fallback/ignored notices. Light and dark themes; fits phone width; no external assets. Checked in headless Microsoft Edge (the Chrome extension wasn't connected); fixed a cutoff label rounding 13.7% to "14%" and a phone-width overflow.
+- **Tests: 102 pass** (25 API): valid, 5 missing fields, 5 invalid values, typos, Shield/payment/SKU fallbacks, normalisation, ignored/banned fields + no echo, health, page + samples (no PII fields), API = batch for samples, **API = `predict.py` for 60 test orders**, service never reads `data/`.
+- **Clean-machine test:** fresh copy without `data/`/`outputs/`/venv, Python 3.13. **First attempt failed**: JupyterLab's long file paths broke `pip install` under Windows' 260-character limit. Fixed by moving Jupyter/matplotlib to `requirements-dev.txt`. **Second attempt passed**: install 107 s, service up, screen renders, sample score identical to development (0.8447), typo → 422, 93 tests pass + 9 data tests skipped, server log has paths only (no bodies).
+- Found during the test: the pinned numpy 2.5 / scipy 1.18 **require Python ≥ 3.12**, so the README states 3.12 or 3.13 and `pyproject.toml` requires ≥ 3.12.
+- Found during the test: `outputs/predictions.csv` had been re-saved by Excel after Phase 7 (18 empty columns, quoted values), and the format test caught it. Regenerated with `python -m kestrel.predict` (identical scores). **Don't open-and-save it in Excel before submitting.**
+
+**Decisions**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| Scoring logic in `kestrel.service`, thin FastAPI layer | Tests call the same code; the app stays readable | Logic inside the route |
+| `requirements.txt` = service + tests; `requirements-dev.txt` = + notebooks | Clean-machine install failed on Jupyter's long paths; the service doesn't need it | One file (Phase 0 choice; contradicted by the test) |
+| Python 3.12 / 3.13 stated, not 3.11 | Pinned numpy/scipy require ≥ 3.12 | Loosen pins for 3.11 (untestable here, less reproducible) |
+| `payment_mode` optional with fallback; required numerics strict | User spec: explicit or missing unknowns average out; numbers can't be guessed | Reject every unknown (blocks orders) |
+| Ignored fields reported by **name only** | Data minimisation; no notes/addresses ever echoed | Echo the request back |
+| Reason threshold 0.10 log-odds | Avoids trivial reasons crowding out real ones | 0.05 (a 12%-vs-10% discount became a "reason") |
+| `/?sample=N` deep link | Headless verification and a clean screen recording | - |
+| Headless Edge for visual checks | Chrome extension not connected; Edge ships with Windows | Skip visual checks |
+
+**Next step:** Phase 9, the memo to Ritu (decision, the number, the rupees, next week; scale framing; Shield gently; Tanmay's asks), then Phase 10 (recording script, submission form).
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
@@ -411,3 +441,5 @@ Code: `src/kestrel/predict.py` (`python -m kestrel.predict`); test: `tests/test_
 | 2026-10-06 | **v2.7:** decision stored in `model_meta.json` (`decision`); default capacity top 25% (cutoff 13.7%); API `recommended_action` = CALL at/above the cutoff, else SHIP, never HOLD; margin claim corrected (≥ 15%; 2 orders at 10%) | Phase 5 results; a Phase 5 test exposed rounding in the Phase 2 claim |
 | 2026-10-06 | **v2.8:** Phase 5 table in consistent per-month units; Phase 7 reports the test share above the 13.7% cutoff (calls/day vs the 25% assumed); Phase 6 holdout ₹ check **skipped** (Apr–Jun predictions were never saved, and re-running `03b` isn't allowed); Phase 9 scale framing | User notes at Phase 5 sign-off |
 | 2026-10-06 | **v2.9:** report made standalone (model ladder, leak table, expected-score reasons); monitors only on orders ≥ 30 days old + a measured-prevention monitor (trigger < ~15%: calls stop paying below 14.3% at the operating point); Phase 8 adds a service-behaviour section; Phase 7 saves a detail file | User notes at Phase 6 sign-off |
+| 2026-10-06 | **v2.10:** Phase 8 section rewritten before building (inputs, validation vs fallbacks, aligned bands, neutral note, clean-machine path, extra tests, no body logging) | User instructions before Phase 8 |
+| 2026-10-06 | **v2.11:** requirements split (service vs notebooks); Python 3.12/3.13; reason threshold 0.10; `/?sample=N` | **Clean-machine test contradicted the Phase 0 single-requirements choice** (JupyterLab long paths on Windows); numpy/scipy pins need ≥ 3.12 |

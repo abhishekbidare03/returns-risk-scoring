@@ -324,57 +324,35 @@ Contents:
 
 ### Phase 8 - The service: API + one screen (~5h)
 
-**Goal:** a small thing that runs.
+*Rewritten in v2.10 (2026-10-06) to match the Phase 4–7 outcomes; superseded wording removed (city/state/note/pincode inputs, HGB reasons, location reasons, note echoing).*
 
-**API (`app/main.py`, FastAPI):**
-- `POST /score`: takes one order as JSON and returns the model output plus reasons.
-  - **Input (v2.5, data minimisation triggered by Phase 4):** `sku`, `payment_mode`, `promised_delivery_days`, `discount_pct`, `customer_prior_orders`, `customer_prior_returns`, optional `shield_member`; nothing else is needed. *(Original wording, superseded:)* Input: dispatch-time order fields, plus **optional `shield_member`, `city`, `state`** (passed with the order, as the warehouse system would). Missing → `"unknown"` fallback. Extra or banned fields (e.g. `pickup_scheduled_at`) are ignored with a warning.
-  - **Data minimisation (v2.3):** if Phase 4 drops `note_present`/`note_cat` and `address_missing`, then `delivery_note` and `delivery_pincode` are **removed from the API inputs entirely**, logged as a privacy improvement (no gate codes or addresses ever reach the service).
-  - Output:
-  ```json
-  {
-    "order_id": "SAMPLE-001",
-    "return_probability": 0.27,
-    "risk_band": "High",
-    "recommended_action": "CALL",
-    "expected_value_inr": {"call": 63.6, "hold": -41.0, "ship": 0},
-    "reasons": [
-      "Customer returned 2 of their last 4 orders",
-      "Robot vacuums are returned ~2x more often than average",
-      "Order paid by cash on delivery"
-    ],
-    "shield_member": true,
-    "fallbacks_used": [],
-    "warnings": [],
-    "note": "Don't hold: call instead. Shield member, so holding is especially costly.",
-    "model_version": "2026-10-xx"
-  }
-  ```
-  - `fallbacks_used` lists any field that fell back to "unknown"/defaults (e.g. `["shield_member", "sku → family default"]`), so the employee knows the score rests on less information.
-  - `recommended_action` reflects "call the top X% the team can handle" (the capacity cut-off from Phase 5), never "hold". **(v2.7)** It reads `model_meta.json` → `decision`: CALL if calibrated risk ≥ the cutoff (default 13.7% = top 25%), else SHIP. The response also shows the capacity menu so ops can see where the order sits.
-- `GET /health`: model loaded, version, validation metrics.
-- `GET /`: serves the screen. `GET /docs`: auto Swagger, free from FastAPI.
-- Input validation via Pydantic: clear 422 messages.
-- **No model API is used.** If an optional LLM summary is ever added, it is off by default and disabled with a polite message when no key is present. The default build uses no LLM.
+**Goal:** a small thing that runs, from the repo alone (no `data/`, no API key, no LLM).
 
-**Reasons (`src/kestrel/reasons.py`):** LR → coefficient × value, with the four correlated customer-history features (prior returns, prior orders, prior return rate, has-prior-return) **summed into one "customer history" reason** (v2.5); HGB → swap-to-typical-value score drop. Take the top positive contributions and map them to templates written for an ops employee (no jargon, no raw coefficients). Also include the top "lowering risk" factor, for balance. **Location reasons are worded neutrally** and honestly about the mechanism, e.g. *"Orders delivered to this area are returned more often, especially with longer delivery times"*, never as a judgement of the customer.
+**API (`app/main.py`, FastAPI; scoring logic in `src/kestrel/service.py`):**
+- `POST /score`: one order as JSON.
+  - **Input, 7 fields:** `sku`, `payment_mode`, `promised_delivery_days`, `discount_pct`, `customer_prior_orders`, `customer_prior_returns`, optional `shield_member`. Optional `order_id` is echoed back. Nothing else is used.
+  - **Validation vs fallbacks:**
+    - Required numeric field missing or invalid (wrong type, out of range, prior returns > prior orders) → **422** with a plain message naming the field.
+    - Category typo (e.g. `payment_mode: "upi"`) → **422 listing the allowed values**.
+    - `shield_member` or `payment_mode` **missing or explicitly `"unknown"`** → weighted-average fallback (training shares), reported in `fallbacks_used`.
+    - Unknown SKU → family from the SKU code if readable, else the family average; reported in `fallbacks_used`.
+    - Any other field (incl. notes, pincode, city, post-dispatch columns) → **ignored**, listed in `ignored_fields` with a warning. Never stored or echoed.
+  - **Output:** `order_id`, `return_probability`, `risk_band`, `vs_typical` (e.g. "2.4× a typical order"), `recommended_action` (**CALL / SHIP only, never HOLD**), `note`, `call_value_inr` (expected net of calling, conservative), `reasons_raising` (2–3), `reasons_lowering` (1), `fallbacks_used`, `ignored_fields`, `warnings`, `model_version`.
+  - **Risk bands aligned to the action**, read from `model_meta.json`: **Low < 7%**, **Medium 7%–13.7% (SHIP)**, **High ≥ 13.7% (CALL)**.
+  - **Note** (same rule for everyone): CALL → *"Don't hold: call to confirm before dispatch."* SHIP → *"Ship as normal."*
+- `GET /health`: model loaded, version, cutoff, validation metrics. `GET /`: the screen. `GET /docs`: Swagger.
+- **Privacy:** the service never logs request bodies; inputs are not stored.
+- **No model API, no LLM, no key.**
 
-**Screen (`app/static/index.html`):**
-- Pick a **synthetic** sample from `app/samples.json` (no real rows, no gate codes) or fill the form manually.
-- "Score" button → calls `/score` → shows the probability gauge, risk band, recommended action, reasons, ₹ expected value and any fallbacks used.
-- Delivery notes are never echoed back raw.
+**Reasons (`src/kestrel/reasons.py`):** logistic-regression contributions **relative to the average order** (scaled value × coefficient; one-hot level minus its training share × coefficient). The four history features are **summed into one "customer history" reason**. Plain, neutral words for a service-desk employee, e.g. *"Cash-on-delivery orders are returned more often"*, *"Long delivery promise (9 days)"*, *"Shield members return more often; returns are free for them"*. No coefficients shown. A fallback field contributes nothing (it's scored as average) and is named in `fallbacks_used` instead.
 
-**Report addition (v2.9):** after Phase 8, add a short **"service behaviour"** section to `evidence/backtest_report.md`: input validation, fallback cases, API test results.
+**Screen (`app/static/index.html`, served by the same app):** a form for the 7 fields plus a dropdown of **synthetic** sample orders (`app/samples.json`); calls `/score`; shows probability, band, vs typical, action and note, reasons, ₹ value of calling, fallbacks and ignored fields. No notes, addresses or customer IDs anywhere.
 
-**Tests:** `tests/test_api.py` (valid request, missing field, banned field, unknown SKU, missing `shield_member` → fallback reported, **service starts with `data/` absent**) and the parity test from Phase 3.
+**Tests (`tests/test_api.py`):** valid order; missing field → 422; invalid value → 422; category typo → 422 with allowed values; unknown SKU; unknown/missing Shield; extra/banned field ignored and listed; `/health`; `GET /` returns the page; **parity: API score = `predict.py` score for the same test orders** and = batch score for the sample orders.
 
-**Clean-machine run (README):** needs only the repo: `model.joblib` + `model_meta.json` (with product catalogue) + `samples.json`.
-```
-python -m venv .venv && .venv\Scripts\activate   (or source .venv/bin/activate)
-pip install -r requirements.txt
-uvicorn app.main:app --port 8000   # open http://localhost:8000
-```
-The README says pack files go in `data/` **only for retraining** (`python -m kestrel.train`). We test this in a fresh folder/venv with no `data/` before submitting. Optional `Dockerfile` as a second route.
+**Clean-machine run (README):** Python **3.12 or 3.13** (v2.11: pinned numpy/scipy need ≥ 3.12). `pip install -r requirements.txt` also installs the project package (`-e .`), and `app/main.py` adds `src/` to the path as a fallback. Separate Windows and Mac/Linux commands (activate on its own line, no `&&`). Start: `uvicorn app.main:app --port 8000`, open http://localhost:8000. `data/` is needed **only** for retraining (`python -m kestrel.train`). **Clean-machine test:** copy the repo without `data/`, `outputs/` and `.venv`, make a new venv, follow the README exactly, and confirm the screen works; record the result.
+
+**Report addition:** after Phase 8, a short **"service behaviour"** section in `evidence/backtest_report.md` (input validation, fallback cases, API test results).
 
 ---
 
@@ -499,5 +477,7 @@ The README says pack files go in `data/` **only for retraining** (`python -m kes
 | 2026-10-06 | v2.7 | Phase 5 decision stored in `model_meta.json`; default capacity top 25% (cutoff 13.7%); API action = CALL/SHIP from the stored cutoff; margin claim corrected to ≥ 15% (2 orders at 10%, below the cutoff) | Phase 5 results (`key_findings.md` Phase 5) |
 | 2026-10-06 | v2.8 | Phase 5 units fixed; Phase 6 holdout ₹ check skipped (predictions not saved; no re-run); Phase 7 cutoff-share check; Phase 9 scale framing | User notes at Phase 5 sign-off |
 | 2026-10-06 | v2.9 | Report made standalone (model ladder, leak table, expected-score reasons); monitors only on orders ≥ 30 days old + measured prevention-rate monitor; Phase 8 adds a service-behaviour section to the report; Phase 7 saves a detail file | User notes at Phase 6 sign-off |
+| 2026-10-06 | v2.10 | Phase 8 section rewritten: superseded inputs/reasons removed; neutral note; 422 vs fallback rules; risk bands aligned to the action (Low < 7%, Medium < 13.7%, High = CALL); clean-machine path; extra tests (API = predict.py, typo 422, GET /); no request-body logging | User instructions before Phase 8 |
+| 2026-10-06 | v2.11 | `requirements.txt` (service + tests) / `requirements-dev.txt` (+ notebooks); Python 3.12/3.13 (not 3.11); reason threshold 0.10; `/?sample=N` deep link | Clean-machine test: JupyterLab install failed on Windows long paths; pinned numpy/scipy need ≥ 3.12 |
 
 *Any later change: add a row here and a matching entry in `key_findings.md`.*
