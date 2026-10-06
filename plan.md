@@ -303,6 +303,7 @@ Contents:
    - **History coefficients:** one line explaining that the negative coefficient on prior return rate is collinearity among the four history features, not an error, which is why reasons merge them.
 5. **Failure gallery:** 5–10 concrete orders the model got confidently wrong, and why (anonymised).
 6. **Leak simulation result** from Phase 4 (AUC before vs after).
+   - **Holdout ₹ check (v2.8): skipped.** It required the Apr–Jun predictions from the single `03b` run; they were kept in memory only (aggregates and a decile table were saved), and `03b` must not be re-run. Noted as a limitation; the ₹ figures rest on the walk-forward folds.
 7. **Automated checks:** `pytest` results (data rules, leakage guard, parity, API contract, no-`data/` start).
 8. **Expected test score:** **ROC-AUC and PR-AUC, each as a range** from the walk-forward spread (preliminary ROC-AUC ≈ 0.74–0.77). PR-AUC depends on the test period's return rate, so it's stated with that caveat. Also list reasons it could be lower (season shift, Shield mix change, customers new to the test period).
 
@@ -314,6 +315,7 @@ Contents:
 2. Apply the **sigmoid calibrator fitted on walk-forward out-of-fold predictions** (no recalibration on in-sample data).
 3. Score `test_unlabelled.csv` through the same pipeline → `outputs/predictions.csv`. **Submit the sigmoid-calibrated scores** (identical AUC to raw scores, and consistent with what the API returns).
 4. Checks: exactly one row per `order_id`; same IDs and order as `sample_submission.csv`; no NaN; scores in [0,1]; no Excel artifact columns; score distribution compared with validation.
+   - **(v2.8)** Report the share of test orders at or above the **13.7% cutoff** and the implied calls/day (test volume ÷ days), compared with the 25% assumed in Phase 5.
 5. Write the **expected ROC-AUC and PR-AUC ranges with reasoning** for the submission form (from Phase 6).
 
 ---
@@ -379,6 +381,7 @@ The README says pack files go in `data/` **only for retraining** (`python -m kes
 1. **The decision:** don't hold flagged orders. **Call the top X% the team can handle.** Holding loses customers (12% cancel) and saves far less than a call.
 2. **The number:** "95% accuracy" isn't the right measure (doing nothing scores ~89%). The honest number to take to the board: *"Of the orders we flag, ~X% come back, about 3× the normal rate; calling the top Y% of orders catches ~Z% of all returns."*
 3. **The rupees:** net ₹ saved per month at ₹1,150 per return (and at ₹600); cost of the calls; why calls beat holds whenever a lost sale costs more than ₹375 in margin (true for typical Kestrel orders, per Phase 5; one line per family if cheap families differ).
+3b. **Scale framing (v2.8):** ~78 returns/month at the export's volume cost ~₹89,800/month (₹1,150 each); calling the top 25% avoids ~1 in 5 of them and nets ~13% of that return cost (conservative). The 35% prevention rate is the least certain input, which is why next week is a **controlled pilot**.
 4. **Shield, gently:** Shield customers are 22% of orders and 36% of returns. Not most returns, but they do return about twice as often. Calling them is fine; holding them is not.
 5. **Next week:** a 2–4 week controlled pilot. Call the top-risk orders in one group, leave a matched control group alone, and measure returns and ₹.
 6. **Ask for Tanmay:** save the service status as it was at dispatch, or keep the full event history (not just the latest event), and fix the Oct 2025 paise values in the source.
@@ -490,5 +493,6 @@ The README says pack files go in `data/` **only for retraining** (`python -m kes
 | 2026-10-06 | v2.5 | Holdout in a separate notebook `03b` run once; final all-data model saved in Phase 4 (Phase 7 = scoring + checks); API input reduced to the 7 fields the model uses; history reasons grouped | Phase 4 results: LR on 9 core features, no candidate kept; correlated history coefficients (see `key_findings.md` Phase 4) |
 | 2026-10-06 | v2.6 | Phase 6: gift-order calibration check on OOF predictions as a known limitation (with ₹ effect); collinearity note for history coefficients in the evidence | User notes at Phase 4 sign-off |
 | 2026-10-06 | v2.7 | Phase 5 decision stored in `model_meta.json`; default capacity top 25% (cutoff 13.7%); API action = CALL/SHIP from the stored cutoff; margin claim corrected to ≥ 15% (2 orders at 10%, below the cutoff) | Phase 5 results (`key_findings.md` Phase 5) |
+| 2026-10-06 | v2.8 | Phase 5 units fixed; Phase 6 holdout ₹ check skipped (predictions not saved; no re-run); Phase 7 cutoff-share check; Phase 9 scale framing | User notes at Phase 5 sign-off |
 
 *Any later change: add a row here and a matching entry in `key_findings.md`.*

@@ -127,4 +127,14 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 **"Call, don't hold" applies to everyone; Shield is one more reason never to hold.** A risk model flags Shield members at about twice their share (42–49% of flagged orders vs 22% of all orders) without bias: flagged Shield and non-Shield orders return at similar rates (29.6% vs 25.7% at top 25%). Holding them would cancel ~9 Shield orders a month from the highest-lifetime-value segment; a call puts no order at risk.
 
 ## 9. Model governance
-_To be completed in Phase 6/7._
+
+*Set in Phase 6 (2026-10-06) from the error analysis (`evidence/backtest_report.md`).*
+
+| Item | Rule |
+|---|---|
+| Retraining | Quarterly, with `python -m kestrel.train` on the latest export (same rules: dedupe, paise check, banned columns). Re-run notebooks 01–05; a new holdout quarter is scored once per release |
+| Monthly monitoring | (1) ROC-AUC on last month's dispatched orders once outcomes are known (expected 0.74–0.82); (2) predicted vs actual return rate (expected within ±3 pts); (3) share of orders at or above the 13.7% cutoff (expected 22–28%) |
+| Review triggers | Monthly AUC < 0.72 two months running; calibration gap > 3 pts two months running; called share outside 18–32%; any change to the export's columns or the payment gateway |
+| Data feed asks | Shield status **as of the order** (removes the snapshot risk); service status as of dispatch or the full event history, never only the latest event; Oct-2025 paise values fixed at source |
+| Known limitations to revisit with more data | Gift under-prediction (−7.2 pts, ~₹260/month); channel (partner +2.7 / marketplace −2.2 pts); robot vacuums −3.4 pts; customers with no CRM history (AUC 0.745) |
+| The 35% call-prevention rate | Re-estimate from the controlled pilot before scaling up; the cutoff and capacity rule are recomputed with the measured rate |

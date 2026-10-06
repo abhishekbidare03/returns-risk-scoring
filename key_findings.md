@@ -303,14 +303,20 @@ Evidence: `notebooks/04_decision_economics.ipynb`, `src/kestrel/economics.py`, `
 **Assumptions:** return ₹1,150 (₹600 sensitivity); call ₹45, prevents 35%; hold → 12% cancel; **margin 25% of order value (assumption, 15/35% sensitivity)**; headline call value ignores the margin a prevented return keeps (conservative). **Declared before computing:** default capacity = largest top-X% whose marginal band is still net-positive.
 
 **Results**
-| Policy (realised, walk-forward folds) | Orders actioned | Precision | Returns avoided | Good orders lost | Net ₹/month | Net ₹ per 1,000 orders |
+All figures per month at the export's volume (~699 orders/month); per-1,000-order figures scale to any volume.
+
+| Policy (realised, walk-forward folds) | Share of orders actioned | Precision | Returns avoided / month | Good orders lost / month | Net ₹ / month | Net ₹ per 1,000 orders |
 |---|---|---|---|---|---|---|
-| Ship everything (today) | 0 | - | 0 | 0 | 0 | 0 |
-| **Ritu's ask: hold top 10%** | 10% | 41% | 31 | 45 | **−10,400** | −14,800 |
-| Hold top 20% | 20% | 31% | 47 | 106 | −26,500 | −37,900 |
-| Call top 10% | 10% | 41% | 91 | 0 | +8,300 | +11,900 |
-| **Call top 25% (recommended default)** | 25% | 27% | 16.7/month | 0 | **+11,400** | **+16,300** |
-| Call everyone above break-even (11.2%) | 32% | 24% | 169 | 0 | +11,200 | +16,000 |
+| Ship everything (today) | 0% | - | 0 | 0 | 0 | 0 |
+| **Ritu's ask: hold top 10%** | 10% | 41% | 3.4 | 5.0 | **−10,400** | −14,800 |
+| Hold top 20% | 20% | 31% | 5.2 | 11.6 | −26,500 | −37,900 |
+| Call top 10% | 10% | 41% | 10.0 | 0 | +8,300 | +11,900 |
+| **Call top 25% (recommended default)** | 25% | 27% | 16.7 | 0 | **+11,400** | **+16,300** |
+| Call everyone above break-even (11.2%) | 32% | 24% | 18.5 | 0 | +11,200 | +16,000 |
+
+*(Units fixed after Phase 5 sign-off: an earlier version mixed 9-month totals with per-month figures.)*
+
+**Scale framing (for the memo):** ~**78 returns/month** at the export's volume cost **~₹89,800/month** (₹1,150 each). Calling the top 25% avoids ~16.7 of them, **~21% (about 1 in 5)**, and nets **~13% of the monthly return cost** (conservative; ~₹11,400). **The 35% prevention rate is the least certain input** (a single spring pilot, no visible dip in the data), which is why the next-week action is a controlled pilot, not a roll-out.
 
 - **Break-evens:** a call pays above **11.2%** risk (₹1,150) or 21.4% (₹600); counting kept margin, a median order pays from 5.7%. **32% of orders** are above 11.2%, so capacity, not break-even, binds.
 - **Holds never win:** for 0.00% of orders is a hold better than a call; a hold beats doing nothing for only 1.8%. Holding loses because the cancelled good orders are disproportionately high-value (robot vacuums, purifiers dominate the top decile), and their lost margin outweighs ₹1,150 × 12% of the returns.
@@ -337,6 +343,32 @@ Evidence: `notebooks/04_decision_economics.ipynb`, `src/kestrel/economics.py`, `
 
 ---
 
+## Phase 6 - Evidence and error analysis (2026-10-06)
+
+Evidence: **`evidence/backtest_report.md`** (the "evidence that it works, and how often it does not" deliverable), `notebooks/05_error_analysis.ipynb`, `evidence/figures/05_segment_auc.png`. Data: walk-forward out-of-fold predictions; the holdout appears only as the aggregates stored by its single run.
+
+**Results**
+- **Works:** ROC-AUC 0.800 / 0.770 / 0.766 on the walk-forward quarters, 0.787 on the holdout; **monthly AUC 0.741–0.821** (sd 0.029), no drift. Calibrated (deciles 1.7–40.6% predicted vs 1.3–40.7% actual). The share called per month stays at 22–28%, so the 13.7% cutoff behaves like "top ~25%".
+- **How often it's wrong (per month, operating point):** ~175 calls → ~48 to customers who would have returned, **~127 false alarms (73%)** at ₹45 each (~₹5,700/month, already in the net); **~30 returns/month (39%) not flagged**, handled as today. **10% of returns score below 5%** (cheap prepaid orders, no prior returns), the floor for any dispatch-time model.
+- **Segments:** new-to-model customers 0.781 vs seen 0.771 (no weakness). **No CRM history (`prior_orders = 0`): weakest, AUC 0.745 [0.704, 0.784], recall at cutoff 46% vs 66%.** Shield 0.764 vs 0.767, same calibration. Weakest families: room heater 0.724, robot vacuum 0.726. Strongest: ceiling fan 0.828, partner outlet 0.831.
+- **Gift calibration (OOF, known limitation):** gift orders **under-predicted by 7.2 pts** (10.5% vs 17.7%, ×1.69). A gift-aware score would add ~10 gift calls/month worth **~₹260/month** (~2% of policy value). Small: gifts are 7% of orders, and 22% of them are already called (precision 47%).
+- **Other calibration gaps:** robot vacuum −3.4 pts (rising return rate); partner outlet +2.7, marketplace −2.2 (channel not in the model); EMI +2.0.
+- **Failure gallery:** confident false alarms are customers with 2–4 prior returns out of 4–5 orders who kept this one (right on average, wrong individually); confident misses are cheap prepaid orders with no history.
+- **History coefficients:** the negative prior-return-rate coefficient is collinearity among the four history features, not an error, so reasons merge them (line in `03b` and in the report).
+- **Holdout ₹ check: skipped.** The Apr–Jun predictions were never saved, and `03b` is not re-run.
+- **76 tests pass**, run from inside the notebook.
+
+**Decisions**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| Ship as is; record gift, channel, robot-vacuum and no-history gaps as known limitations | Each is small in ₹ (gift ~₹260/month) or failed the selection rule; re-opening selection after seeing the holdout would break the protocol | Add gift/channel now (post-hoc change after the holdout was spent) |
+| Governance in `policy.md` §9: quarterly retrain, three monthly monitors with review triggers, data-feed asks | Makes "how often it doesn't work" operational | No monitoring |
+| Report written for a non-notebook reader | It's a deliverable on its own | Point graders at notebooks |
+
+**Next step:** Phase 7, scoring `test_unlabelled.csv` → `outputs/predictions.csv`, with checks incl. the share above the 13.7% cutoff vs the 25% assumed.
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
@@ -350,3 +382,4 @@ Evidence: `notebooks/04_decision_economics.ipynb`, `src/kestrel/economics.py`, `
 | 2026-10-06 | **v2.5:** holdout in a separate notebook (03b) run once; final all-data model saved in Phase 4 (Phase 7 = scoring + checks); API inputs reduced to the 7 fields the model uses (data minimisation triggered); history reasons grouped | Phase 4 results: LR on 9 core features, no candidate kept; correlated history coefficients |
 | 2026-10-06 | **v2.6:** Phase 6 adds a gift-order calibration check (OOF) as a known limitation and the history-coefficient note | User notes at Phase 4 sign-off |
 | 2026-10-06 | **v2.7:** decision stored in `model_meta.json` (`decision`); default capacity top 25% (cutoff 13.7%); API `recommended_action` = CALL at/above the cutoff, else SHIP, never HOLD; margin claim corrected (≥ 15%; 2 orders at 10%) | Phase 5 results; a Phase 5 test exposed rounding in the Phase 2 claim |
+| 2026-10-06 | **v2.8:** Phase 5 table in consistent per-month units; Phase 7 reports the test share above the 13.7% cutoff (calls/day vs the 25% assumed); Phase 6 holdout ₹ check **skipped** (Apr–Jun predictions were never saved, and re-running `03b` isn't allowed); Phase 9 scale framing | User notes at Phase 5 sign-off |
