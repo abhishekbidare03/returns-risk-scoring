@@ -97,8 +97,10 @@ def build_features(records, catalogue):
     f["has_prior_return"] = (f.customer_prior_returns > 0).astype(float).where(f.customer_prior_returns.notna())
 
     qty = pd.to_numeric(r["qty"], errors="coerce")
-    f["qty"] = qty.fillna(1).astype(float)          # a missing qty means a single unit
-    f["is_gift"] = _flag(r["is_gift"]).fillna(0.0)  # not flagged as a gift -> not a gift
+    f["qty"] = qty.fillna(1).astype(float)          # 94% of orders are single units; reported below
+    note_fallback(qty.isna(), "qty")
+    f["is_gift"] = _flag(r["is_gift"])              # unknown -> NaN, averaged over Y/N by the model
+    note_fallback(f.is_gift.isna(), "is_gift")
 
     # --- customer fields passed with the order (training joins them from customers.csv)
     f["shield"] = _flag(r["shield_member"])

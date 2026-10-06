@@ -85,10 +85,16 @@ def test_missing_required_field_raises(order):
         one(o)
 
 
-def test_optional_defaults(order):
+def test_optional_defaults_are_reported(order):
     o = {k: order[k] for k in features.REQUIRED_INPUTS}
-    x, _ = one(o)
-    assert x.qty == 1.0 and x.is_gift == 0.0 and x.note_cat == "none" and x.address_missing == 1.0
+    x, fb = one(o)
+    assert x.qty == 1.0 and np.isnan(x.is_gift) and x.note_cat == "none" and x.address_missing == 1.0
+    assert {"qty", "is_gift", "shield_member", "city"} <= set(fb)
+
+
+def test_unreadable_sku_gives_unknown_family(order):
+    x, fb = one(dict(order, sku="ZZ-123"))
+    assert x.family == "unknown" and "sku" in fb
 
 
 # --- privacy: raw note text never reaches the features --------------------------------------

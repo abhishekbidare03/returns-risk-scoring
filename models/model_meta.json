@@ -1,0 +1,244 @@
+{
+  "model_version": "2026-10-06",
+  "kind": "lr",
+  "params": {},
+  "features": [
+    "promised_delivery_days",
+    "customer_prior_returns",
+    "customer_prior_orders",
+    "prior_return_rate",
+    "has_prior_return",
+    "discount_pct",
+    "shield",
+    "payment_mode",
+    "family"
+  ],
+  "monotonic": false,
+  "half_life_months": null,
+  "calibrator": {
+    "a": 0.9857221421902737,
+    "b": -0.06792476127104964,
+    "fitted_on_folds": [
+      "Jul-Sep 25",
+      "Oct-Dec 25",
+      "Jan-Mar 26"
+    ]
+  },
+  "unknown_value_weights": {
+    "shield": {
+      "0.0": 0.7784653465346535,
+      "1.0": 0.22153465346534654
+    },
+    "payment_mode": {
+      "prepaid_upi": 0.3732863670982483,
+      "cod": 0.3000761614623001,
+      "prepaid_card": 0.20496953541507998,
+      "emi": 0.12166793602437166
+    },
+    "family": {
+      "Robot Vacuum": 0.14794364051789793,
+      "Ceiling Fan": 0.14575399847677076,
+      "Room Heater": 0.14518278750952018,
+      "Air Fryer": 0.14432597105864434,
+      "Induction Cooktop": 0.14051789794364053,
+      "Mixer Grinder": 0.13813785224676314,
+      "Water Purifier": 0.13813785224676314
+    }
+  },
+  "numeric_fill": {},
+  "training_window": "2025-04-01 to 2026-06-30",
+  "metrics": {
+    "walk_forward": {
+      "Jul-Sep 25": {
+        "roc_auc": 0.7996,
+        "pr_auc": 0.4191,
+        "brier": 0.0805,
+        "base_rate": 0.1108,
+        "orders": 2157.0,
+        "precision_top5": 0.5833,
+        "recall_top5": 0.2636,
+        "precision_top10": 0.4583,
+        "recall_top10": 0.4142,
+        "precision_top20": 0.3132,
+        "recall_top20": 0.5649
+      },
+      "Oct-Dec 25": {
+        "roc_auc": 0.7696,
+        "pr_auc": 0.3439,
+        "brier": 0.0845,
+        "base_rate": 0.1081,
+        "orders": 2082.0,
+        "precision_top5": 0.4231,
+        "recall_top5": 0.1956,
+        "precision_top10": 0.3702,
+        "recall_top10": 0.3422,
+        "precision_top20": 0.3029,
+        "recall_top20": 0.56
+      },
+      "Jan-Mar 26": {
+        "roc_auc": 0.7658,
+        "pr_auc": 0.3761,
+        "brier": 0.0882,
+        "base_rate": 0.1162,
+        "orders": 2126.0,
+        "precision_top5": 0.5377,
+        "recall_top5": 0.2308,
+        "precision_top10": 0.4038,
+        "recall_top10": 0.3482,
+        "precision_top20": 0.3106,
+        "recall_top20": 0.5344
+      }
+    },
+    "holdout_apr_jun_2026": {
+      "roc_auc": 0.7872,
+      "pr_auc": 0.421,
+      "brier": 0.0843,
+      "base_rate": 0.1152,
+      "orders": 2126.0,
+      "precision_top5": 0.5755,
+      "recall_top5": 0.249,
+      "precision_top10": 0.4366,
+      "recall_top10": 0.3796,
+      "precision_top20": 0.3318,
+      "recall_top20": 0.5755
+    },
+    "expected_test": {
+      "roc_auc_range": [
+        0.766,
+        0.8
+      ],
+      "pr_auc_range": [
+        0.344,
+        0.421
+      ]
+    }
+  },
+  "catalogue": {
+    "KH-AF-01": {
+      "family": "Air Fryer",
+      "tier": "Lite",
+      "list_price_inr": 5199.0,
+      "launch_date": "2023-11-04"
+    },
+    "KH-AF-02": {
+      "family": "Air Fryer",
+      "tier": "Pro",
+      "list_price_inr": 6499.0,
+      "launch_date": "2023-09-07"
+    },
+    "KH-AF-03": {
+      "family": "Air Fryer",
+      "tier": "Max",
+      "list_price_inr": 8773.0,
+      "launch_date": "2024-02-02"
+    },
+    "KH-MG-01": {
+      "family": "Mixer Grinder",
+      "tier": "Lite",
+      "list_price_inr": 3199.0,
+      "launch_date": "2023-05-27"
+    },
+    "KH-MG-02": {
+      "family": "Mixer Grinder",
+      "tier": "Pro",
+      "list_price_inr": 3999.0,
+      "launch_date": "2023-09-20"
+    },
+    "KH-MG-03": {
+      "family": "Mixer Grinder",
+      "tier": "Max",
+      "list_price_inr": 5398.0,
+      "launch_date": "2024-12-09"
+    },
+    "KH-WP-01": {
+      "family": "Water Purifier",
+      "tier": "Lite",
+      "list_price_inr": 11999.0,
+      "launch_date": "2024-09-03"
+    },
+    "KH-WP-02": {
+      "family": "Water Purifier",
+      "tier": "Pro",
+      "list_price_inr": 14999.0,
+      "launch_date": "2023-11-19"
+    },
+    "KH-WP-03": {
+      "family": "Water Purifier",
+      "tier": "Max",
+      "list_price_inr": 20248.0,
+      "launch_date": "2023-10-16"
+    },
+    "KH-RV-01": {
+      "family": "Robot Vacuum",
+      "tier": "Lite",
+      "list_price_inr": 17599.0,
+      "launch_date": "2024-03-06"
+    },
+    "KH-RV-02": {
+      "family": "Robot Vacuum",
+      "tier": "Pro",
+      "list_price_inr": 21999.0,
+      "launch_date": "2024-01-27"
+    },
+    "KH-RV-03": {
+      "family": "Robot Vacuum",
+      "tier": "Max",
+      "list_price_inr": 29698.0,
+      "launch_date": "2023-10-26"
+    },
+    "KH-IC-01": {
+      "family": "Induction Cooktop",
+      "tier": "Lite",
+      "list_price_inr": 2399.0,
+      "launch_date": "2024-05-16"
+    },
+    "KH-IC-02": {
+      "family": "Induction Cooktop",
+      "tier": "Pro",
+      "list_price_inr": 2999.0,
+      "launch_date": "2023-11-09"
+    },
+    "KH-IC-03": {
+      "family": "Induction Cooktop",
+      "tier": "Max",
+      "list_price_inr": 4048.0,
+      "launch_date": "2025-01-28"
+    },
+    "KH-CF-01": {
+      "family": "Ceiling Fan",
+      "tier": "Lite",
+      "list_price_inr": 2799.0,
+      "launch_date": "2024-09-27"
+    },
+    "KH-CF-02": {
+      "family": "Ceiling Fan",
+      "tier": "Pro",
+      "list_price_inr": 3499.0,
+      "launch_date": "2023-10-15"
+    },
+    "KH-CF-03": {
+      "family": "Ceiling Fan",
+      "tier": "Max",
+      "list_price_inr": 4723.0,
+      "launch_date": "2024-10-12"
+    },
+    "KH-RH-01": {
+      "family": "Room Heater",
+      "tier": "Lite",
+      "list_price_inr": 1999.0,
+      "launch_date": "2023-07-29"
+    },
+    "KH-RH-02": {
+      "family": "Room Heater",
+      "tier": "Pro",
+      "list_price_inr": 2499.0,
+      "launch_date": "2024-02-21"
+    },
+    "KH-RH-03": {
+      "family": "Room Heater",
+      "tier": "Max",
+      "list_price_inr": 3373.0,
+      "launch_date": "2024-12-23"
+    }
+  }
+}

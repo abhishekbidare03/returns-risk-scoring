@@ -224,6 +224,76 @@ Code: `src/kestrel/features.py` (+ constants in `config.py`); tests: `tests/test
 
 ---
 
+## Phase 4 - Modelling and validation (2026-10-06)
+
+Evidence: `notebooks/03_modeling.ipynb` (selection; **never reads Apr–Jun 2026**), `notebooks/03b_holdout_and_final.ipynb` (one-time holdout + final fit), `src/kestrel/model.py`, `src/kestrel/train.py`, `tests/test_model.py`. Figures: `evidence/figures/03_calibration_oof.png`, `03b_calibration_holdout.png`. Rules were written into `policy.md` §5.7 and `plan.md` (v2.4) **before** anything ran; every decision below is computed by code from them.
+
+**Setup.** Selection data Apr 2025 – Mar 2026 (8,378 orders). Folds: validate Jul–Sep 2025 (train 2,013 orders), Oct–Dec 2025 (train 4,170), Jan–Mar 2026 (train 6,252); ~2,100 orders and 225–247 returns per fold. No class weighting or resampling.
+
+### Every model tried (64 configurations; ROC-AUC per fold Jul–Sep / Oct–Dec / Jan–Mar)
+| Model | AUC per fold | Mean AUC | Mean PR-AUC | Verdict |
+|---|---|---|---|---|
+| Base rate (constant) | 0.500 / 0.500 / 0.500 | 0.500 | 0.112 | Floor |
+| Rule: prior returns × Shield lookup | 0.673 / 0.649 / 0.658 | 0.660 | 0.228 | "Spreadsheet" bar |
+| **LR, 9 core features** | **0.800 / 0.770 / 0.766** | **0.778** | **0.380** | **Chosen** (+0.118 over rule, every fold) |
+| HGB, core, default | 0.727 / 0.732 / 0.723 | 0.727 | 0.290 | Overfits at this size |
+| LR core + one candidate (8 runs) | best: gift +0.005 / −0.001 / +0.004; channel +0.002 / +0.001 / +0.007 | ≤ 0.781 | - | **None passes** (≥ 0.005 on ≥ 2/3 folds) |
+| HGB core + one candidate (8 runs, check) | gift +0.012 / +0.004 / +0.008; product age −0.039 on one fold | - | - | Larger swings both ways |
+| LR core + metro / + city | 0.802 / 0.770 / 0.763; 0.795 / 0.770 / 0.762 | 0.778; 0.776 | - | **No location** (metro −0.0001, city −0.0027) |
+| HGB core + metro / + city | 0.737 / 0.740 / 0.731; 0.733 / 0.730 / 0.724 | 0.736; 0.729 | - | Check only |
+| LR selected − Shield | 0.791 / 0.748 / 0.751 | 0.763 | 0.355 | **Shield costs 0.009 / 0.021 / 0.015**: kept (core), reliance documented |
+| LR, recency half-life 6 m / 12 m | 0.800 / 0.771 / 0.766; 0.800 / 0.770 / 0.766 | 0.779; 0.779 | - | Dropped (≤ +0.001) |
+| HGB selected, monotonic | 0.769 / 0.745 / 0.729 | 0.748 | 0.323 | Monotonic beats unconstrained by +0.021 → kept for HGB |
+| LR grid C ∈ {0.01 … 3} (6) | flat from C = 0.3 to 3; C = 0.01 → 0.764 | 0.764–0.778 | - | **Default C = 1 stays** (no point passes) |
+| HGB grid (24, monotonic) | best lr 0.03 / 7 leaves / 100 iter: 0.786 / 0.760 / 0.762 | 0.769 | 0.342 | Best HGB |
+| **LR vs tuned HGB** | HGB − LR: −0.014 / −0.009 / −0.004 (bootstrap [−0.016, −0.003]) | - | - | **LR ships** (HGB needed > +0.01) |
+
+### Results
+- **Chosen model: logistic regression (C = 1) on 9 features**: promised delivery days, prior returns, prior orders, prior return rate, has-prior-return, discount, Shield, payment mode, family. Price is represented once (family + discount); no location, gift, channel, notes, address, tier, qty or product age.
+- **Gift** has a real +5.5-point effect (Phase 2) but missed the bar by a hair (+0.0048 and +0.0043 on two folds). It touches 7% of orders and barely changes the ranking, so the pre-declared rule drops it. Recorded as a near-miss.
+- **Location** adds nothing once delivery days are in the model, consistent with Phase 2 §10b (half the metro gap is delivery time).
+- **Calibration:** fold slopes 1.08 / 0.93 / 0.96, so fold 1 is not clearly less confident (criterion > 0.2) and the calibrator uses all three folds: a = 0.986, b = −0.068, close to the identity, because LR on the true class balance is already calibrated. OOF deciles run from 1.7% to 40.6% on the diagonal.
+- **Leak simulation (Jan–Mar 2026 fold):** LR with the post-dispatch columns gets **AUC 0.997, 99.3% accuracy** as exported. With dispatch-time values (`INSTALL_BOOKED` for fans/vacuums/purifiers, `NONE` otherwise, no pickup) it drops to **0.711**, below the honest model's 0.766, and flags **0.05%** of orders at 0.5. HGB: 0.995 → 0.681. ("Nobody returns" = 88.4% accuracy on this fold.)
+- **Unknown values** (explicit, not imputer defaults; `ReturnRiskModel.predict_proba`): an unknown Shield / payment mode / family is scored as the training-share-weighted average of its known versions (Shield 22.2 / 77.8; payment UPI 37 / COD 30 / card 20 / EMI 12; families ~14% each), and still listed in `fallbacks`. Tests confirm each unknown scores strictly between its known versions; Shield equals the 22/78 average exactly. City, metro and gift need no handling because they aren't in the model.
+
+### One-time holdout (Apr–Jun 2026, scored once on 2026-10-06 12:34 in `03b`)
+Trained Apr 2025 – Mar 2026 with the walk-forward calibrator; 2,126 orders, 245 returns (11.5%).
+
+| Metric | Jul–Sep 25 | Oct–Dec 25 | Jan–Mar 26 | **Apr–Jun 26 (holdout)** |
+|---|---|---|---|---|
+| ROC-AUC | 0.800 | 0.770 | 0.766 | **0.787** |
+| PR-AUC | 0.419 | 0.344 | 0.376 | **0.421** |
+| Brier | 0.080 | 0.084 | 0.088 | **0.084** |
+| Top 5%: precision / recall | 58% / 26% | 42% / 20% | 54% / 23% | **58% / 25%** |
+| Top 10%: precision / recall | 46% / 41% | 37% / 34% | 40% / 35% | **44% / 38%** |
+| Top 20%: precision / recall | 31% / 57% | 30% / 56% | 31% / 53% | **33% / 58%** |
+
+Holdout calibration: mean predicted 11.0% vs actual 11.5%; the top decile is 40.2% predicted vs 43.7% actual. Accuracy at 0.5 is 89.4% vs 88.5% for "nobody returns", which is why accuracy isn't the metric.
+
+**Expected score on the test quarter (Jul–Sep 2026):** **ROC-AUC 0.77–0.80** (point estimate ~0.78; range = the 3 folds + holdout, which includes the same season a year earlier at 0.800). **PR-AUC 0.34–0.42** at an ~11% return rate; PR-AUC scales with the test quarter's return rate, roughly 3.2–3.8× the base rate. Risks to the downside: more first-time customers, a Shield-status shift, or season effects not seen in one year of history.
+
+**Final model** retrained on all 15 months (Apr 2025 – Jun 2026) with the same configuration and calibrator: `models/model.joblib` (4.6 KB, no customer data) + `models/model_meta.json` (config, calibrator, unknown-value weights, metrics, 21-row catalogue). `python -m kestrel.train` reproduces it exactly (verified). Largest effects (log-odds per +1 SD or vs the average category): prior returns +0.56, robot vacuum +0.54, promised days +0.44, Shield +0.39, COD +0.34, discount +0.24; prepaid UPI −0.82, ceiling fan −0.82, mixer −0.80.
+
+### Decisions
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| **Ship LR (C = 1), 9 core features** | Best on every fold; HGB worse even after tuning and monotonic constraints; exact, explainable contributions | HGB (−0.009 mean); LR + candidates (none passes) |
+| Drop gift, location, channel, notes, address, tier, qty, product age | Pre-declared rule: none improves AUC ≥ 0.005 on ≥ 2/3 folds | Keep gift on its effect size (the rule was fixed in advance; Phase 2 marked it a candidate, not a pass) |
+| Keep Shield, document reliance (−0.015 AUC without it) | Core driver; snapshot risk is disclosed, not hidden | Drop for snapshot risk (loses real signal on every fold) |
+| No recency weighting; default C | Within noise | - |
+| Calibrator on all three folds (a = 0.986, b = −0.068) | Fold 1 not less confident by the declared criterion | Folds 2–3 only |
+| Separate notebook for the holdout, run once after selection was frozen; config asserted unchanged | Makes "touched exactly once" auditable | Holdout section inside the selection notebook (re-runs during development) |
+| Phase 7 is now just scoring + checks | The final all-data model already exists | Retrain again in Phase 7 |
+
+**Consequences for later phases**
+- **Phase 8, data minimisation (triggered):** notes, address, city, gift, qty and channel are not in the model, so the API needs only `sku`, `payment_mode`, `promised_delivery_days`, `discount_pct`, `customer_prior_orders`, `customer_prior_returns` and an optional `shield_member`. **`delivery_note`, `delivery_pincode`, `city`/`state`, `is_gift`, `qty` and `sales_channel` are removed from the API inputs**: a privacy improvement (no gate codes, addresses or location reach the service).
+- **Phase 8, reasons:** the four history features are correlated (prior return rate gets a negative coefficient once prior returns and has-prior-return are in). Their contributions must be **summed into one "customer history" reason**, not shown separately.
+- **Phase 5:** calibrated probabilities are trustworthy (holdout mean 11.0% vs 11.5%; top decile 40% vs 44%). Capacity table from the top-k precision/recall above.
+
+**Next step:** Phase 5, the decision economics (call capacity table, ₹ net per month, sensitivity, Shield share of flagged orders).
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
@@ -233,3 +303,5 @@ Code: `src/kestrel/features.py` (+ constants in `config.py`); tests: `tests/test
 | 2026-10-06 | **v2.2: Phase 3 feature list revised.** Pincode region dropped (→ `city`/`metro`); tenure dropped; hour/weekday/festive dropped; `value_vs_list` and `warranty_months` dropped as redundant; weak fields → Phase 4 ablation candidates; tenure removed from the snapshot ablation | **Data contradicted the plan** (Phase 2): `440` = all 12 non-metro cities (8.4% Nagpur); tenure AUC 0.504 + PSI 0.60; hour/weekday/season flat; warranty = family; value = list × qty × (1 − discount) |
 | 2026-10-06 | Spring-pilot figures corrected to deduplicated 10.9% / 12.1% / 11.5% | Pre-work numbers included duplicate rows; conclusion unchanged |
 | 2026-10-06 | **v2.3:** selection only on walk-forward folds ending Mar 2026; ablation rule fixed in advance; metro preferred within noise; price = family + discount (order value economics-only); gift a serious candidate; §5a margin resolved; Phase 8 neutral location wording + data minimisation | User sign-off on Phase 2 + Phase 2 §10 evidence (city gap halves within delivery bands; within-family value flat; gift +5.5 pts; crossover < call break-even) |
+| 2026-10-06 | **v2.4:** Phase 4 rules fixed before running (noise threshold, LR-vs-HGB rule, no class weighting, declared grid, run order, calibration-fold criterion, unknown-value averaging, one-time holdout); gift/qty defaults reported as fallbacks | User instructions before Phase 4 |
+| 2026-10-06 | **v2.5:** holdout in a separate notebook (03b) run once; final all-data model saved in Phase 4 (Phase 7 = scoring + checks); API inputs reduced to the 7 fields the model uses (data minimisation triggered); history reasons grouped | Phase 4 results: LR on 9 core features, no candidate kept; correlated history coefficients |

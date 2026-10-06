@@ -40,6 +40,8 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 |---|---|---|
 *Revised after Phase 2 (2026-10-06). Phase 4 ablation decides the "candidate" rows.*
 
+> **Final model (Phase 4, 2026-10-06):** logistic regression on the **9 core features only**: `promised_delivery_days`, `customer_prior_returns`, `customer_prior_orders`, prior return rate, has-prior-return, `discount_pct`, `shield_member`, `payment_mode`, family (from `sku`). **No candidate passed the selection rule** (§5.7): gift, location (metro/city), channel, tier, qty, address, product age and notes are all out. The service therefore accepts only `sku`, `payment_mode`, `promised_delivery_days`, `discount_pct`, `customer_prior_orders`, `customer_prior_returns` and optional `shield_member` (**data minimisation**: no note, pincode, city or gift reaches the service). Unknown Shield / payment mode / family is scored as the training-share-weighted average of the known values and reported as a fallback.
+
 | Raw input | Allowed derivatives | Status | Source at serve time |
 |---|---|---|---|
 | `payment_mode`, `promised_delivery_days`, `discount_pct` | as-is / encoded | core | order record |
@@ -81,7 +83,17 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 4. **Calibrating on in-sample predictions.** The calibrator is fitted on walk-forward out-of-fold predictions only.
 5. **Reporting accuracy as the headline metric.** It is shown only to explain why it misleads (base rate 11.4%).
 6. **Judging rare flags (< ~10% of orders) by single-field AUC.** Use effect size with a 95% interval instead (a rare flag can't move AUC much even when its effect is real, e.g. gift).
-7. **Post-hoc ablation rules.** The rule is fixed before Phase 4 runs: *a candidate field is kept only if it improves AUC on most walk-forward folds (≥ 2 of 3), not just on average. When results are within noise, the simpler set wins.*
+7. **Post-hoc selection rules.** All rules below are fixed **before** Phase 4 runs (2026-10-06):
+   - **Folds:** three expanding walk-forward folds: validate Jul–Sep 2025, Oct–Dec 2025, Jan–Mar 2026; each trained on all earlier months.
+   - **Noise threshold:** a change counts only if it improves ROC-AUC by **≥ 0.005 on at least 2 of the 3 folds**. A paired-bootstrap 95% interval of the mean ΔAUC is reported next to each decision for transparency only; it does not decide.
+   - **Candidates:** a candidate field is kept only if it passes the noise threshold against the set without it. Within noise → the simpler set.
+   - **Location:** `metro` is preferred; `city` replaces it only if it beats `metro` by the noise threshold.
+   - **Core features** are not removed by this rule; the Shield ablation documents reliance on a snapshot-table field.
+   - **LR vs HGB:** HGB is chosen only if it beats LR by **> 0.01 mean AUC and on ≥ 2 of 3 folds**; otherwise LR ships.
+   - **Monotonic HGB** (increasing in prior returns, prior return rate, promised days, discount) is kept if its AUC is not worse than unconstrained HGB by the noise threshold on ≥ 2 of 3 folds.
+   - **Tuning:** the default stays unless a point from the pre-declared grid beats it by the noise threshold; among those, the best mean AUC wins. Grid: LR `C` ∈ {0.01, 0.03, 0.1, 0.3, 1, 3} (default 1); HGB `learning_rate` ∈ {0.03, 0.1} × `max_leaf_nodes` ∈ {7, 15, 31} × `max_iter` ∈ {100, 300} × `l2_regularization` ∈ {0, 1}, `min_samples_leaf` = 40 (default 0.1 / 31 / 100 / 0).
+   - **Recency weighting:** half-life 6 or 12 months vs none; same noise rule.
+8. **Class weighting or resampling** (balanced class weights, SMOTE, undersampling). Probabilities drive the rupee decisions, so the model must be trained on the true class balance.
 
 ## 6. Cost assumptions
 
