@@ -11,6 +11,16 @@ Model: `models/model.joblib` (version 2026-10-06), trained Apr 2025 – Jun 2026
 | scores in [0, 1] | PASS |
 | no fallbacks needed | PASS |
 
+## File fingerprint
+
+SHA-256 of `outputs/predictions.csv`: `e9fd178769fd391fae978b56cf7ed67c1521bd4b73aa7315e37311ed4ab7092d`
+
+If the submitted file gives the same SHA-256, it is byte-for-byte the file these checks were run on. Any change, including opening and re-saving it in Excel, gives a different value. Verify with:
+
+- Windows (PowerShell): `Get-FileHash outputs\predictions.csv -Algorithm SHA256`
+- macOS: `shasum -a 256 outputs/predictions.csv`
+- Linux: `sha256sum outputs/predictions.csv`
+
 ## Score distribution: test vs walk-forward out-of-fold
 
 |  | test (Jul-Sep 2026) | walk-forward OOF |

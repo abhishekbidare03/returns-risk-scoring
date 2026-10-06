@@ -85,6 +85,16 @@ python -m kestrel.predict           # writes outputs/predictions.csv + evidence/
 
 (On Windows prefix with `.venv\Scripts\`, e.g. `.venv\Scripts\python -m pytest`.)
 
+**Verify the predictions file before submitting.** `python -m kestrel.predict` records the file's SHA-256 fingerprint in `evidence/predictions_check.md`. The same value means the file is byte-for-byte the one that was checked; any edit, including opening and re-saving it in Excel, changes it. Compare with:
+
+```
+Get-FileHash outputs\predictions.csv -Algorithm SHA256      # Windows (PowerShell)
+shasum -a 256 outputs/predictions.csv                        # macOS
+sha256sum outputs/predictions.csv                            # Linux
+```
+
+`python -m pytest` also fails if the file no longer matches its recorded fingerprint.
+
 The notebooks need the extra packages in `requirements-dev.txt` (`pip install -r requirements-dev.txt`; Jupyter + matplotlib). On Windows, JupyterLab may need [long-path support](https://pip.pypa.io/warnings/enable-long-paths) if the project sits in a deep folder; the service doesn't. The analysis is in `notebooks/` and is meant to be read in order: 01 data audit → 02 exploration → 03 model selection → 03b one-time holdout (**read it, don't re-run it**) → 04 rupee economics → 05 error analysis.
 
 ---

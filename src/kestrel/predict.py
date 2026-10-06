@@ -7,6 +7,7 @@ Writes
   outputs/test_scored_detail.csv   + recommended action and fallbacks per order (git-ignored; avoids re-runs)
   evidence/predictions_check.md    checks and score-distribution comparison (aggregates only)
 """
+import hashlib
 import json
 
 import joblib
@@ -18,6 +19,11 @@ from .config import DATA_DIR, MODELS_DIR, OUTPUTS_DIR, ROOT
 from .data import load_pack, read_raw
 from .features import build_features, training_records
 from .train import FINAL_CONFIG, SELECTION_END, load_training_frame, train_final
+
+
+def sha256(path):
+    """Fingerprint of the exact bytes of a file (to verify the submitted predictions are the checked ones)."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def md_table(df):
@@ -68,8 +74,10 @@ def main():
     assert all(checks.values()), checks
 
     OUTPUTS_DIR.mkdir(exist_ok=True)
-    sub.to_csv(OUTPUTS_DIR / "predictions.csv", index=False)
-    detail.drop(columns="order_ts").to_csv(OUTPUTS_DIR / "test_scored_detail.csv", index=False)
+    # LF line endings on every OS, so the fingerprint is the same on Windows, macOS and Linux
+    sub.to_csv(OUTPUTS_DIR / "predictions.csv", index=False, lineterminator="\n")
+    detail.drop(columns="order_ts").to_csv(OUTPUTS_DIR / "test_scored_detail.csv", index=False, lineterminator="\n")
+    digest = sha256(OUTPUTS_DIR / "predictions.csv")
 
     # ---- distribution vs walk-forward out-of-fold scores (never the holdout)
     X, y, ts, catalogue, _ = load_training_frame(pack)
@@ -92,6 +100,13 @@ def main():
              f"Model: `models/model.joblib` (version {meta['model_version']}), trained Apr 2025 – Jun 2026. File: `outputs/predictions.csv` (order_id, score).", "",
              "| Check | Result |", "|---|---|"]
     lines += [f"| {k} | {'PASS' if v else 'FAIL'} |" for k, v in checks.items()]
+    lines += ["", "## File fingerprint", "",
+              f"SHA-256 of `outputs/predictions.csv`: `{digest}`", "",
+              "If the submitted file gives the same SHA-256, it is byte-for-byte the file these checks were run on. "
+              "Any change, including opening and re-saving it in Excel, gives a different value. Verify with:", "",
+              "- Windows (PowerShell): `Get-FileHash outputs\\predictions.csv -Algorithm SHA256`",
+              "- macOS: `shasum -a 256 outputs/predictions.csv`",
+              "- Linux: `sha256sum outputs/predictions.csv`"]
     lines += ["", "## Score distribution: test vs walk-forward out-of-fold", "", md_table(dist.round(4)), "",
               f"Kolmogorov–Smirnov distance {ks.statistic:.3f} (p = {ks.pvalue:.2f}). Mean predicted return rate on test: **{sub.score.mean():.1%}** (training return rate 11.4%).", "",
               "## Share at or above the 13.7% call cutoff", "",

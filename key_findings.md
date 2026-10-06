@@ -450,6 +450,14 @@ Evidence: **`evidence/scenario_tests.md`** (46 cases, expected vs actual), `test
 
 ---
 
+## Phase 8c - Predictions fingerprint (2026-10-06)
+
+- `python -m kestrel.predict` now writes `predictions.csv` with LF line endings on every OS and records its **SHA-256** in `evidence/predictions_check.md`, with verify commands for Windows/macOS/Linux (also in the README). The Python value matches Windows' `Get-FileHash`.
+- New test `test_predictions_match_recorded_sha256` fails if the file changes after it was checked (e.g. an Excel re-save, which happened once). 154 tests pass.
+- **Not done, by decision:** Python 3.10/3.11 support. It would need a different model format (the scikit-learn pickle is tied to 1.9.1 / Python ≥ 3.11), and the brief only asks that the service start on a clean machine, which the tested 3.12/3.13 path already does.
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
