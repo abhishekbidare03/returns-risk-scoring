@@ -120,7 +120,16 @@ def train_final(config, X, y, ts, catalogue, end=None):
     return model, oof
 
 
-def save(model, catalogue, config, metrics, path=MODELS_DIR):
+RANGE_FIELDS = ("promised_delivery_days", "discount_pct", "customer_prior_orders", "customer_prior_returns")
+
+
+def input_ranges(X):
+    """Training min/max of the numeric inputs; the service caps out-of-range values to these (policy.md §3)."""
+    return {f: [float(X[f].min()), float(X[f].max())] for f in RANGE_FIELDS}
+
+
+def save(model, catalogue, config, metrics, path=MODELS_DIR, ranges=None, keep=None):
+    """Write model.joblib + model_meta.json. `keep`: extra blocks to carry over (e.g. the Phase 5 decision)."""
     path.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, path / "model.joblib")
     meta = {
@@ -131,8 +140,10 @@ def save(model, catalogue, config, metrics, path=MODELS_DIR):
                        "fitted_on_folds": [FOLD_NAMES[i] for i in config["calibration_folds"]]},
         "unknown_value_weights": model.marginals, "numeric_fill": model.numeric_fill,
         "training_window": config.get("training_window"), "metrics": metrics,
+        "input_ranges": ranges or {},
         "catalogue": catalogue,
     }
+    meta.update(keep or {})
     (path / "model_meta.json").write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
     return meta
 
@@ -143,8 +154,10 @@ def main():
     X, y, ts, catalogue, _ = load_training_frame()
     model, _ = train_final(FINAL_CONFIG, X, y, ts, catalogue)
     meta_path = MODELS_DIR / "model_meta.json"
-    metrics = json.loads(meta_path.read_text())["metrics"] if meta_path.exists() else {}
-    save(model, catalogue, dict(FINAL_CONFIG, training_window="2025-04-01 to 2026-06-30"), metrics)
+    old = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+    keep = {k: old[k] for k in ("decision",) if k in old}          # Phase 5 decision lives in the meta too
+    save(model, catalogue, dict(FINAL_CONFIG, training_window="2025-04-01 to 2026-06-30"), old.get("metrics", {}),
+         ranges=input_ranges(X), keep=keep)
     print("saved", MODELS_DIR / "model.joblib")
 
 

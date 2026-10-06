@@ -120,7 +120,7 @@ def build_features(records, catalogue):
             note_fallback(~ok, col)
 
     # --- product fields from the catalogue (unknown SKU -> family from the SKU code)
-    sku = r["sku"].astype("string").str.strip()
+    sku = r["sku"].astype("string").str.strip().str.upper()     # "kh-af-02 " -> "KH-AF-02"
     known_sku = sku.isin(list(catalogue))
     cat_family = sku.map(lambda s: catalogue.get(s, {}).get("family") if isinstance(s, str) else None)
     code_family = sku.str.extract(r"^KH-([A-Z]{2})-", expand=False).map(FAMILY_BY_CODE)

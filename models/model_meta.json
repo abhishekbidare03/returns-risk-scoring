@@ -113,6 +113,24 @@
       ]
     }
   },
+  "input_ranges": {
+    "promised_delivery_days": [
+      1.0,
+      12.0
+    ],
+    "discount_pct": [
+      0.0,
+      60.0
+    ],
+    "customer_prior_orders": [
+      0.0,
+      10.0
+    ],
+    "customer_prior_returns": [
+      0.0,
+      6.0
+    ]
+  },
   "catalogue": {
     "KH-AF-01": {
       "family": "Air Fryer",

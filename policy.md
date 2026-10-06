@@ -57,6 +57,8 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 | `delivery_pincode` | **`address_missing` only** | weak candidate (+1.2 pts [−1.1, 3.5]) | order record |
 | `delivery_note` | `note_present`, `note_cat` (known template with digits removed, else `other`) | candidate (no signal in EDA) | order record |
 
+**Out-of-range inputs (added after black-box testing, 2026-10-06):** the service scores values outside the training range at the edge of that range, with a visible warning: promised days 1–12, discount 0–60%, prior orders 0–10, prior returns 0–6 (`model_meta.json` → `input_ranges`). Prior orders above 10 are scaled down with returns so the return rate is kept. Physically impossible values (negative, discount > 100, delivery > 60 days, returns > orders) are rejected with 422.
+
 **Not used (Phase 2 evidence):**
 | Input / derivative | Why |
 |---|---|

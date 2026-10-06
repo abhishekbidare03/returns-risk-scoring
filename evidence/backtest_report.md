@@ -117,7 +117,12 @@ The service (`app/main.py`, `src/kestrel/service.py`) loads only `models/model.j
 
 **Reasons** are logistic-regression contributions relative to the average order. The four correlated customer-history features are summed into one reason, and only effects of at least 0.10 on the log-odds (about 10% change in the odds) become sentences. Wording is neutral and plain, e.g. "Cash-on-delivery orders are returned more often", "Longer delivery promise than usual (9 days; typical 5)", "Shield members return more often; returns are free for them".
 
-**API test results:** 25 API tests pass (102 in the whole suite). **Clean-machine test:** passed on a fresh copy without `data/` using Python 3.13, after one fix (Jupyter moved to `requirements-dev.txt` because of Windows long paths); see `clean_machine_test.md`.
+| Value outside the training range (e.g. 60 delivery days, 100% discount, 200 prior orders) | **Scored at the edge of the training range** (1–12 days, 0–60%, 0–10 orders, 0–6 returns; stored in `model_meta.json`), with a **warning naming the field, the value given and the range**. Prior orders above the range are scaled down together with returns, so the return rate is kept. Reasons still quote the values entered | `test_out_of_range_is_capped_with_warning`, `test_prior_orders_capped_keeping_return_rate` |
+| SKU in lower case or with spaces | Normalised (`kh-af-02` → `KH-AF-02`) | `test_sku_is_case_insensitive` |
+
+**Black-box scenario sheet:** **46 / 46 pass** (`scenario_tests.md`). These are made-up orders tested against business-sense expectations written before looking at the model: realistic orders, one-change-at-a-time comparisons, extremes, messy input, edge cases. The first manual run found 3 issues, all fixed: lower-case SKU treated as unknown; out-of-range values extrapolated without warning (60 days → 99.99%); a positive call value shown next to SHIP without explanation.
+
+**API test results:** 31 API tests + 46 scenario tests pass (152 in the whole suite). **Clean-machine test:** passed on a fresh copy without `data/` using Python 3.13, after one fix (Jupyter moved to `requirements-dev.txt` because of Windows long paths); see `clean_machine_test.md`.
 
 ## 8. Reproduce
 

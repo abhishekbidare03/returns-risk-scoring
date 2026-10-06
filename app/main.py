@@ -100,7 +100,7 @@ def score(order: Order):
     extra = sorted((order.model_extra or {}).keys())
     result = service.score(order.model_dump())
     result["ignored_fields"] = extra
-    result["warnings"] = [f"'{k}' ignored: {IGNORED_WHY.get(k, 'not used by the model')}" for k in extra]
+    result["warnings"] = result.get("warnings", []) + [f"'{k}' ignored: {IGNORED_WHY.get(k, 'not used by the model')}" for k in extra]
     return result
 
 

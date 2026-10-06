@@ -426,6 +426,28 @@ Code: `app/main.py` (FastAPI, validation, 422 handler, ignored fields), `src/kes
 
 ---
 
+## Phase 8b - Black-box testing and fixes (2026-10-06)
+
+Evidence: **`evidence/scenario_tests.md`** (46 cases, expected vs actual), `tests/scenarios.py` + `tests/test_scenarios.py`, report §7.
+
+**What happened:** the user tested the service as an outsider would, with made-up orders and business-sense expectations, without using the model's internals: realistic orders, one change at a time, extremes, messy input. **34/37 passed on the first run** (the user's tally of the sheet). Three issues were found:
+1. **Lower-case SKU** (`kh-af-02`) treated as an unknown product. Cause: SKUs were trimmed but not upper-cased. **Fix:** upper-case after trimming.
+2. **Out-of-range values extrapolated silently:** 60 delivery days → 99.99% CALL; 100% discount → 51% CALL, no warning. A linear model extrapolates far outside 1–12 days / 0–60%. **Fix:** training min/max stored in `model_meta.json` (`input_ranges`); values outside are scored at the range edge with a warning naming the field, the value and the range (60 days now scores as 12 → 19.3%; 100% as 60% → 21.2%). Prior orders above 10 are scaled down **together with returns** so the return rate is kept (capping each separately would turn 50/200 = 25% into 6/10 = 60%). Reasons still quote the values entered.
+3. **A positive call value shown next to SHIP** (orders between the 11.2% break-even and the 13.7% capacity cutoff) read as a contradiction. **Fix:** the screen now says *"A call would roughly break even; below the call cutoff, so ship."* Also: percentages below 20% now show one decimal, so 12.9% no longer displays as "13%" next to a 13.7% cutoff; a near-cutoff sample was added (sample 8).
+
+**Also found while fixing:** `python -m kestrel.train` rebuilt `model_meta.json` from scratch and would have **dropped the Phase 5 `decision` block** the API depends on. Fixed: retraining now carries the decision over; verified the model is identical and only `input_ranges` was added.
+
+**Result:** scenario sheet **46/46** (all 40 sheet rows + 6 extras: negative number, huge number, empty body, `true` for Shield, `" COD "`, 5,000 prior orders), asserted in the test suite so it can't regress. **152 tests pass.**
+
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| Cap at the training range and warn, rather than reject | A real order can be unusual; ops still needs a score, and the warning tells them to be careful | Reject with 422 (blocks orders); extrapolate silently (99.99% on a typo) |
+| Keep 422 for physically impossible values (negative, > 100%, > 60 days, returns > orders) | Those are data errors, not unusual orders | Cap them too |
+| Scale returns with orders when capping history | Keeps the return rate, the signal that matters | Cap each count separately |
+| Scenario sheet as code (`tests/scenarios.py`) generating the evidence file | Evidence and tests can't drift apart | A hand-written table |
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |

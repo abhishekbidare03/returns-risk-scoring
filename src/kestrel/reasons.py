@@ -69,15 +69,18 @@ def _sentence(group, up, x, typical):
     raise ValueError(group)
 
 
-def explain(model, X_row, unknown_groups=(), n_up=3, n_down=1):
+def explain(model, X_row, unknown_groups=(), n_up=3, n_down=1, display=None):
     """Return (reasons raising risk, reasons lowering risk) for one order (a one-row features frame).
-    `unknown_groups` (fallbacks) are scored as average and therefore not given as reasons."""
+    `unknown_groups` (fallbacks) are scored as average and therefore not given as reasons.
+    `display`: values to quote in the sentences (e.g. the user's 60 days when scoring used the capped 12)."""
     row = X_row.copy()
     for f, shares in model.marginals.items():                 # any concrete value works; the group is dropped below
         if f in row and (pd.isna(row[f].iloc[0]) or row[f].iloc[0] == "unknown"):
             row[f] = max(shares, key=shares.get)
     contrib = {g: c for g, c in contributions(model, row).items() if g not in unknown_groups}
-    x = row.iloc[0]
+    x = row.iloc[0].copy()
+    for k, v in (display or {}).items():
+        x[k] = v
     pre = model.pipeline.named_steps["pre"]
     num = pre.named_transformers_["num"]
     typical = dict(zip(pre.transformers_[0][2], num.mean_))

@@ -144,3 +144,24 @@ def test_service_never_reads_data_dir():
     for mod in (m, s):
         src = inspect.getsource(mod)
         assert "DATA_DIR" not in src and "read_csv" not in src and "load_pack" not in src
+
+
+def test_sku_is_case_insensitive():
+    lower, upper = post(sku="kh-rv-02").json(), post(sku="KH-RV-02").json()
+    assert lower["return_probability"] == upper["return_probability"] and lower["family"] == "Robot Vacuum"
+    assert lower["fallbacks_used"] == []
+
+
+@pytest.mark.parametrize("field, value, edge", [("promised_delivery_days", 60, 12), ("discount_pct", 100, 60)])
+def test_out_of_range_is_capped_with_warning(field, value, edge):
+    d, at_edge = post(**{field: value}).json(), post(**{field: edge}).json()
+    assert d["return_probability"] == at_edge["return_probability"]          # scored at the training edge
+    w = [x for x in d["warnings"] if x.startswith(field)]
+    assert len(w) == 1 and str(value) in w[0] and f"-{edge}" in w[0]          # names field, value given, range
+    assert at_edge["warnings"] == []
+
+
+def test_prior_orders_capped_keeping_return_rate():
+    d = post(customer_prior_orders=200, customer_prior_returns=50).json()
+    assert any("scored as 10 orders with 2 returns" in w for w in d["warnings"])
+    assert any("50 of 200" in r for r in d["reasons_raising"])               # reasons quote what was entered

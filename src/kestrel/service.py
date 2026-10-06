@@ -36,13 +36,47 @@ class ScoringService:
     def band(self, p):
         return "High" if p >= self.cutoff else ("Medium" if p >= self.low_below else "Low")
 
+    def cap_to_training_range(self, order):
+        """Values outside what the model was trained on are scored at the nearest edge of the training range,
+        with a warning. Prior orders above the range are scaled down together with prior returns, so the
+        customer's return rate is kept (capping each count on its own would distort it)."""
+        rng = self.meta.get("input_ranges", {})
+        o, warnings = dict(order), []
+
+        def note(field, given, lo, hi, used):
+            warnings.append(f"{field} = {given:g} is outside the range the model was trained on ({lo:g}-{hi:g}); "
+                            f"scored as {used:g}. Treat this result with caution.")
+
+        for f in ("promised_delivery_days", "discount_pct"):
+            if f in rng and o.get(f) is not None:
+                lo, hi = rng[f]
+                if not lo <= o[f] <= hi:
+                    o[f] = min(max(o[f], lo), hi)
+                    note(f, order[f], lo, hi, o[f])
+        if "customer_prior_orders" in rng:
+            hi_o = rng["customer_prior_orders"][1]
+            hi_r = rng.get("customer_prior_returns", [0, hi_o])[1]
+            n, r = o["customer_prior_orders"], o["customer_prior_returns"]
+            if n > hi_o:
+                o["customer_prior_orders"] = int(hi_o)
+                o["customer_prior_returns"] = int(round(r * hi_o / n))
+                warnings.append(f"customer_prior_orders = {n} is outside the range the model was trained on (0-{hi_o:g}); "
+                                f"scored as {int(hi_o)} orders with {o['customer_prior_returns']} returns (same return rate). "
+                                "Treat this result with caution.")
+            if o["customer_prior_returns"] > hi_r:
+                note("customer_prior_returns", o["customer_prior_returns"], 0, hi_r, hi_r)
+                o["customer_prior_returns"] = int(hi_r)
+        return o, warnings
+
     def score(self, order):
         """`order`: validated dict with the 7 model fields (shield_member / payment_mode may be None or 'unknown')."""
-        rec = pd.DataFrame([{k: order.get(k) for k in MODEL_FIELDS}])
+        used, range_warnings = self.cap_to_training_range(order)
+        rec = pd.DataFrame([{k: used.get(k) for k in MODEL_FIELDS}])
         X, fb = build_features(rec, self.meta["catalogue"])
         fallbacks = [f for f in fb.iloc[0] if f in FALLBACK_GROUPS]
         p = float(self.model.predict_proba(X)[0])
-        raising, lowering, _ = explain(self.model, X, unknown_groups={FALLBACK_GROUPS[f] for f in fallbacks})
+        shown = {k: order[k] for k in ("promised_delivery_days", "discount_pct", "customer_prior_orders", "customer_prior_returns")}
+        raising, lowering, _ = explain(self.model, X, unknown_groups={FALLBACK_GROUPS[f] for f in fallbacks}, display=shown)
         action = "CALL" if p >= self.cutoff else "SHIP"
         ratio = p / self.typical
         return {
@@ -56,6 +90,7 @@ class ScoringService:
             "reasons_raising": raising,
             "reasons_lowering": lowering,
             "fallbacks_used": [FALLBACK_TEXT[f] for f in fallbacks],
+            "warnings": range_warnings,
             "family": X.family.iloc[0],
             "model_version": self.meta["model_version"],
         }

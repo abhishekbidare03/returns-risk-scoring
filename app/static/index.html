@@ -154,7 +154,7 @@ const FIELDS = ["sku", "payment_mode", "promised_delivery_days", "discount_pct",
 let SAMPLES = [], CUTOFF = 0.1365, ORDER_ID = null;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-const pct = (p) => (p * 100).toFixed(p < 0.1 ? 1 : 0) + "%";
+const pct = (p) => (p * 100).toFixed(p < 0.2 ? 1 : 0) + "%";   // one decimal near the 13.7% cutoff
 const pct1 = (p) => (p * 100).toFixed(1) + "%";
 const inr = (v) => "₹" + Math.abs(v).toLocaleString("en-IN", {maximumFractionDigits: 0});
 
@@ -202,12 +202,17 @@ function renderError(d) {
 function render(d) {
   const p = d.return_probability, w = Math.min(p / 0.6, 1) * 100, t = Math.min(CUTOFF / 0.6, 1) * 100;
   const list = (xs, cls, empty) => xs.length ? `<ul class="${cls}">${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">${empty}</p>`;
-  const callLine = d.call_value_inr > 0
-    ? `Expected net value of a call: <b>${inr(d.call_value_inr)}</b> (₹45 call vs. a ₹1,150 return avoided 35% of the time).`
-    : `A call would cost more than it is expected to save (${inr(d.call_value_inr)} net).`;
+  let callLine;
+  if (d.recommended_action === "CALL") {
+    callLine = `Expected net value of a call: <b>${inr(d.call_value_inr)}</b> (₹45 call vs. a ₹1,150 return avoided 35% of the time).`;
+  } else if (d.call_value_inr >= 0) {
+    callLine = `A call would roughly break even; below the call cutoff, so ship.`;
+  } else {
+    callLine = `A call would cost more than it is expected to save (${inr(d.call_value_inr)} net).`;
+  }
   const notes = [];
   if (d.fallbacks_used.length) notes.push(`<div class="notice"><b>Scored with less information</b><ul>${d.fallbacks_used.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`);
-  if (d.ignored_fields && d.ignored_fields.length) notes.push(`<div class="notice"><b>Ignored fields</b><ul>${d.warnings.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`);
+  if (d.warnings && d.warnings.length) notes.push(`<div class="notice"><b>Check these inputs</b><ul>${d.warnings.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`);
   $("result").innerHTML = `
     ${d.order_id ? `<div class="vs">${esc(d.order_id)} · ${esc(d.family)}</div>` : `<div class="vs">${esc(d.family)}</div>`}
     <div class="headline">
