@@ -124,6 +124,9 @@ CASES = [
      lambda s, d: s == 422 and {"sku", "promised_delivery_days", "discount_pct", "customer_prior_orders", "customer_prior_returns"} <= {x["field"] for x in d["problems"]}),
     ("X4", "Shield true (JSON boolean)", "Same as Y", b(shield_member=True), same_as(b(shield_member="Y"))),
     ("X5", "Payment ' COD ' (spaces + capitals)", "Same as cod", b(payment_mode=" COD "), same_as(b(payment_mode="cod"))),
+    ("X7", "Just below the call cutoff: base with 1 of 2 returned (call value >= 0)", "SHIP, and the note says a call would roughly break even",
+     b(customer_prior_returns=1),
+     lambda s, d: d["recommended_action"] == "SHIP" and d["call_value_inr"] >= 0 and "roughly break even" in d["note"]),
     ("X6", "Huge prior orders: 5,000 orders / 1,000 returns", "Scored with a warning, return rate kept",
      b(customer_prior_orders=5000, customer_prior_returns=1000), lambda s, d: s == 200 and warns(d, "customer_prior_orders")),
 ]
@@ -157,8 +160,7 @@ def write_markdown(path=Path(__file__).resolve().parents[1] / "evidence" / "scen
         "History: the first manual run (2026-10-06) found three issues, now fixed and covered by these cases: "
         "(1) lower-case SKU treated as unknown (D1); (2) out-of-range values extrapolated with no warning: 60 days scored 99.99% CALL, "
         "100% discount 51% CALL (C2, C4, C7, X6); values outside the training range are now scored at the edge of that range, with a warning; "
-        "(3) the screen showed a positive call value next to SHIP without explanation, and now says \"A call would roughly break even; below the call cutoff, so ship\" "
-        "(screen-only; checked visually).", "",
+        "(3) a positive call value next to SHIP had no explanation; the API note (and so the screen) now says \"A call would roughly break even; below the call cutoff, so ship\" (X7).", "",
         f"Base order (B1) = {P0:.1%}.", "",
         "| ID | Order | Expected | Actual | Pass |", "|---|---|---|---|---|",
     ]

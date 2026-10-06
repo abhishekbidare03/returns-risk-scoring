@@ -206,7 +206,7 @@ function render(d) {
   if (d.recommended_action === "CALL") {
     callLine = `Expected net value of a call: <b>${inr(d.call_value_inr)}</b> (₹45 call vs. a ₹1,150 return avoided 35% of the time).`;
   } else if (d.call_value_inr >= 0) {
-    callLine = `A call would roughly break even; below the call cutoff, so ship.`;
+    callLine = `Expected net value of a call: about ${inr(d.call_value_inr)}, too small to be worth the team's time at the current capacity.`;
   } else {
     callLine = `A call would cost more than it is expected to save (${inr(d.call_value_inr)} net).`;
   }

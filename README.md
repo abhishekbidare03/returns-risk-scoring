@@ -37,6 +37,8 @@ pip install -r requirements.txt
 uvicorn app.main:app --port 8000
 ```
 
+Start it with the project's `.venv` Python as shown, not a system or Anaconda Python, so the pinned library versions the model was saved with are used. After any code change, stop the server (Ctrl+C) and start it again; it doesn't reload by itself.
+
 Then open **http://localhost:8000**. Pick a sample order (synthetic) or type one in, and press **Score order**. `http://localhost:8000/?sample=1` opens sample 1 directly. API docs: http://localhost:8000/docs.
 
 `pip install -r requirements.txt` installs only what the service and tests need, plus this project's code (`src/kestrel`, via `-e .`). No compiler is needed.

@@ -120,9 +120,9 @@ The service (`app/main.py`, `src/kestrel/service.py`) loads only `models/model.j
 | Value outside the training range (e.g. 60 delivery days, 100% discount, 200 prior orders) | **Scored at the edge of the training range** (1–12 days, 0–60%, 0–10 orders, 0–6 returns; stored in `model_meta.json`), with a **warning naming the field, the value given and the range**. Prior orders above the range are scaled down together with returns, so the return rate is kept. Reasons still quote the values entered | `test_out_of_range_is_capped_with_warning`, `test_prior_orders_capped_keeping_return_rate` |
 | SKU in lower case or with spaces | Normalised (`kh-af-02` → `KH-AF-02`) | `test_sku_is_case_insensitive` |
 
-**Black-box scenario sheet:** **46 / 46 pass** (`scenario_tests.md`). These are made-up orders tested against business-sense expectations written before looking at the model: realistic orders, one-change-at-a-time comparisons, extremes, messy input, edge cases. The first manual run found 3 issues, all fixed: lower-case SKU treated as unknown; out-of-range values extrapolated without warning (60 days → 99.99%); a positive call value shown next to SHIP without explanation.
+**Black-box scenario sheet:** **47 / 47 pass** (`scenario_tests.md`). These are made-up orders tested against business-sense expectations written before looking at the model: realistic orders, one-change-at-a-time comparisons, extremes, messy input, edge cases. The first manual run found 3 issues, all fixed: lower-case SKU treated as unknown; out-of-range values extrapolated without warning (60 days → 99.99%); a positive call value shown next to SHIP without explanation (now explained in the API `note`, so the screen and the API agree).
 
-**API test results:** 31 API tests + 46 scenario tests pass (152 in the whole suite). **Clean-machine test:** passed on a fresh copy without `data/` using Python 3.13, after one fix (Jupyter moved to `requirements-dev.txt` because of Windows long paths); see `clean_machine_test.md`.
+**API test results:** 31 API tests + 47 scenario tests pass (153 in the whole suite). **Clean-machine test:** passed on a fresh copy without `data/` using Python 3.13, after one fix (Jupyter moved to `requirements-dev.txt` because of Windows long paths); see `clean_machine_test.md`.
 
 ## 8. Reproduce
 

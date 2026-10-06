@@ -78,6 +78,13 @@ class ScoringService:
         shown = {k: order[k] for k in ("promised_delivery_days", "discount_pct", "customer_prior_orders", "customer_prior_returns")}
         raising, lowering, _ = explain(self.model, X, unknown_groups={FALLBACK_GROUPS[f] for f in fallbacks}, display=shown)
         action = "CALL" if p >= self.cutoff else "SHIP"
+        call_value = round(float(expected_values([p], [0.0], self.costs)["call"][0]), 0)
+        if action == "CALL":
+            note = "Don't hold: call to confirm before dispatch."
+        elif call_value >= 0:
+            note = "A call would roughly break even; below the call cutoff, so ship."
+        else:
+            note = "Ship as normal."
         ratio = p / self.typical
         return {
             "order_id": order.get("order_id"),
@@ -85,8 +92,8 @@ class ScoringService:
             "risk_band": self.band(p),
             "vs_typical": f"{ratio:.1f}× a typical order ({self.typical:.1%})",
             "recommended_action": action,
-            "note": "Don't hold: call to confirm before dispatch." if action == "CALL" else "Ship as normal.",
-            "call_value_inr": round(float(expected_values([p], [0.0], self.costs)["call"][0]), 0),
+            "note": note,
+            "call_value_inr": call_value,
             "reasons_raising": raising,
             "reasons_lowering": lowering,
             "fallbacks_used": [FALLBACK_TEXT[f] for f in fallbacks],
