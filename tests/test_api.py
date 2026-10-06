@@ -87,14 +87,14 @@ def test_case_and_bool_normalisation():
 
 
 def test_extra_and_banned_fields_ignored_and_not_echoed():
-    secret = "Gate code 4725, call before delivery"
-    d = post(delivery_note=secret, delivery_pincode="440365", pickup_scheduled_at="8/20/2026 10:00",
+    secret = "Gate code 0000, call before delivery"
+    d = post(delivery_note=secret, delivery_pincode="999001", pickup_scheduled_at="8/20/2026 10:00",
              last_service_event_type="REVERSE_PICKUP", city="Kota").json()
     base = post().json()
     assert d["return_probability"] == base["return_probability"]          # leaky fields change nothing
     assert set(d["ignored_fields"]) == {"delivery_note", "delivery_pincode", "pickup_scheduled_at", "last_service_event_type", "city"}
     assert any("after dispatch" in w for w in d["warnings"])
-    assert secret not in json.dumps(d) and "440365" not in json.dumps(d)
+    assert secret not in json.dumps(d) and "999001" not in json.dumps(d)
 
 
 def test_health():

@@ -99,7 +99,7 @@ def test_unreadable_sku_gives_unknown_family(order):
 
 # --- privacy: raw note text never reaches the features --------------------------------------
 @pytest.mark.parametrize("note, expected", [
-    ("Gate code 4725, call before delivery", "Gate code #, call before delivery"),
+    ("Gate code 0000, call before delivery", "Gate code #, call before delivery"),
     ("Deliver to neighbour flat 11B if not home", "Deliver to neighbour flat # if not home"),
     ("please call my brother on 98xxxxxx", "other"),
     (None, "none"),
@@ -110,7 +110,7 @@ def test_note_bucketing(order, note, expected):
     assert not any(ch.isdigit() for ch in x.note_cat)
 
 
-@pytest.mark.parametrize("pin, missing", [("0", 1.0), ("000000", 1.0), (None, 1.0), ("440365", 0.0)])
+@pytest.mark.parametrize("pin, missing", [("0", 1.0), ("000000", 1.0), (None, 1.0), ("999001", 0.0)])
 def test_address_missing(order, pin, missing):
     x, _ = one(dict(order, delivery_pincode=pin))
     assert x.address_missing == missing
