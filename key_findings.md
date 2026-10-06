@@ -458,6 +458,24 @@ Evidence: **`evidence/scenario_tests.md`** (46 cases, expected vs actual), `test
 
 ---
 
+## Phase 9 - Memo to Ritu (2026-10-06)
+
+Deliverable: **`memo.pdf`** (one A4 page, rendered from `memo.md` with headless Edge; page count checked = 1).
+
+**Content:** the decision (call the riskiest quarter, ship the rest, hold nothing); the number for the board (*1 in 4 called orders would otherwise come back, 2.4× normal; that quarter holds 6 in 10 returns*), instead of "95% accuracy" (89% for "nobody returns"; 99% only with after-the-fact data, which did worse at dispatch); the rupees (returns ~₹90k/month at the export's volume; hold top 10% −₹10,400 vs call top 25% +₹11,400; 13% of return cost; ₹16,300 per 1,000 orders; still positive at ₹600); Shield, gently (22% of orders / 36% of returns, 2× rate, ~4 in 10 calls); next week (agree capacity with Meenal; a randomised call/no-call test, because the 35% prevention is the one assumed number; Tanmay's three data fixes; hold nothing).
+
+**Review edits (same day):** Subject line added; ₹600 case made precise (*about ₹2,900 a month calling the riskiest 15%*, from the ₹600 capacity table); step 1 notes ~3 calls a day during the half/half test; one line under the board number on how often it is wrong (*about 3 in 4 calls reach customers who would have kept the order, fine at ₹45 and exactly why holds are costly; about 4 in 10 returns aren't flagged and are handled as today*, from Phase 6: 73% / 39%); "a final three months we kept aside and checked only once". Shield section trimmed to two sentences and print margins/type tightened (11/13 mm, 9.7 pt) to keep **exactly one A4 page** (checked).
+
+**Choices**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| Plain words only: no AUC, no "model", no "calibrated" | The brief says not technical | Metrics table |
+| Pilot = randomised half/half among flagged orders, ~300 per arm (~3 months at the export's volume), roll out if prevention > ~15% | 2-proportion power calculation (27.3% vs 17.7%, 5% two-sided, 80% power); 14.3% is where calls stop paying | "Try it and see" (no control → can't measure the 35%) |
+| Volume caveat stated ("at the volume in the data Tanmay sent"; per-1,000 figure given) | The export (~700 orders/month) may be a sample of Kestrel's real volume | Present monthly ₹ as company totals |
+| Every figure traced to the evidence before writing (notebook 04/05, report) | A memo is where a wrong number does the most damage | Write from memory |
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |

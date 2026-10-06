@@ -9,7 +9,7 @@ Runs entirely on your machine: no API key, no external service, no AI model in t
 | Predictions for `test_unlabelled.csv` | `outputs/predictions.csv` (created by `python -m kestrel.predict`; not in git, delivered with the submission) |
 | Working service: one endpoint + one screen | `app/` (this README) |
 | Evidence that it works, and how often it doesn't | `evidence/backtest_report.md`, `evidence/predictions_check.md`, `notebooks/` |
-| Memo to Ritu | `memo.md` (Phase 9) |
+| Memo to Ritu (one page) | `memo.pdf` (source: `memo.md`) |
 | Decisions and rules | `key_findings.md` (what we found and decided, phase by phase), `policy.md` (rules), `plan.md` |
 
 ---
