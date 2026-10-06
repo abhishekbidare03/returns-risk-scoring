@@ -1,0 +1,19 @@
+# ops-policy §10: customer/operational data must not leave the engagement.
+data/
+*.csv
+outputs/*.csv
+# predictions.csv is delivered with the submission, not via any public repo
+
+# Python / tooling
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
