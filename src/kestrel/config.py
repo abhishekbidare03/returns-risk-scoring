@@ -34,3 +34,28 @@ RETURN_COST_SENSITIVITY_INR = 600
 CALL_COST_INR = 45
 CALL_PREVENTION_RATE = 0.35
 HOLD_CANCEL_RATE = 0.12
+
+# ---------------------------------------------------------------------------
+# Feature contract (policy.md §3). Known levels come from the training pack;
+# anything else is mapped to "unknown" and reported as a fallback.
+SALES_CHANNELS = ("app", "marketplace", "partner_outlet", "web")
+PAYMENT_MODES = ("cod", "emi", "prepaid_card", "prepaid_upi")
+FAMILY_BY_CODE = {
+    "AF": "Air Fryer", "CF": "Ceiling Fan", "IC": "Induction Cooktop", "MG": "Mixer Grinder",
+    "RH": "Room Heater", "RV": "Robot Vacuum", "WP": "Water Purifier",
+}
+TIERS = ("Lite", "Pro", "Max")
+CITIES = (
+    "Aurangabad", "Bengaluru", "Bhopal", "Chennai", "Coimbatore", "Delhi", "Hubballi", "Hyderabad",
+    "Indore", "Jaipur", "Kota", "Lucknow", "Mumbai", "Mysuru", "Nagpur", "Nashik", "Pune", "Warangal",
+)
+METRO_CITIES = ("Bengaluru", "Chennai", "Delhi", "Hyderabad", "Mumbai", "Pune")
+# Recurring delivery-note templates (digits -> "#"); anything else is "other" (notebook 01 §8)
+NOTE_TEMPLATES = (
+    "Call before delivery", "Customer requested morning slot", "Deliver after # pm",
+    "Deliver to neighbour flat # if not home", "Do not call, WhatsApp only", "Fragile - handle with care",
+    "Gate code #, call before delivery", "Landmark: opposite Axis Bank ATM", "Landmark: opposite Big Bazaar",
+    "Landmark: opposite HP petrol pump", "Landmark: opposite Metro pillar #", "Landmark: opposite Reliance Fresh",
+    "Landmark: opposite St. Mary's school", "Leave with security", "Office address, weekdays only",
+    "Ring twice", "Third floor, no lift",
+)

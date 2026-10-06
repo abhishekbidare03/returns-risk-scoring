@@ -1,7 +1,9 @@
 # Kestrel Returns Risk - Policy (the rules we commit to)
 
 > Status: **Sections 1–6 written in Phase 1 (2026-10-06)** from `notebooks/01_data_audit.ipynb`. Sections 7–8 are finalised in Phase 5, section 9 in Phase 6/7.
-> Each rule states **what**, **why** (evidence or source) and **where it is enforced** (code / test; filled in from Phase 3 onwards).
+> Each rule states **what**, **why** (evidence or source) and **where it is enforced** (code / test).
+>
+> **Enforcement (Phase 3):** cleaning C1–C4 in `src/kestrel/data.py`, tested by `tests/test_data_rules.py`; allow-list, banned columns, note bucketing, address flag and fallbacks in `src/kestrel/features.py`, tested by `tests/test_features.py` (26 tests passing).
 > Any change to a rule after it is written gets logged in `key_findings.md`.
 
 ---
@@ -41,13 +43,14 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 | Raw input | Allowed derivatives | Status | Source at serve time |
 |---|---|---|---|
 | `payment_mode`, `promised_delivery_days`, `discount_pct` | as-is / encoded | core | order record |
-| `order_value_inr` | cleaned value (C4) | core | order record |
+| `order_value_inr` | cleaned value (C4), **for ₹ economics only, not a model feature** (= list price × qty × (1 − discount); price is represented by `family` + `discount_pct`) | economics only | order record |
 | `customer_prior_orders`, `customer_prior_returns` | as-is, prior return rate, has-prior-return. **Strong but imperfect:** consistent with as-of-order-time (own return excluded, flat by month, never > prior orders, matches test), but a noisy CRM count | core | order record (CRM history as of order time) |
-| `sku` | family; SKU tier (Lite/Pro/Max) and product age as candidates | core (family) | product catalogue embedded in `model_meta.json` |
+| `sku` | family (core); SKU tier (Lite/Pro/Max) as the within-family price level and product age, both candidates | core (family) | product catalogue embedded in `model_meta.json` |
 | `shield_member` | as-is, `"unknown"` fallback. Drift checked: 22.2% train vs 22.1% test, flat by month, **no drift risk** | core | **passed with the order**; training joins `customers.csv` |
-| `city`, `state` | `city` (18 levels, regularised) **or** `metro` flag; `"unknown"` fallback | core (one of the two) | **passed with the order**; training joins `customers.csv` |
-| `sales_channel`, `is_gift`, `qty` | as-is / encoded | candidate | order record |
-| `delivery_pincode` | **`address_missing` only** | candidate | order record |
+| `city`, `state` | `state` is accepted but **not used** (each city maps to exactly one state, so it adds nothing). `metro` flag **or** `city` (18 levels, regularised); `metro` preferred if within noise; `"unknown"` fallback. About half the metro gap is delivery time (non-metro promised 5.6 vs 4.0 days); ~2 pts remain after adjustment | candidate | **passed with the order**; training joins `customers.csv` |
+| `is_gift` | as-is | **serious candidate** (+5.5 pts [2.7, 8.3], RR 1.50 [1.26, 1.78], stable) | order record |
+| `sales_channel`, `qty` | as-is / encoded | candidate (qty: no evidence, −1.2 pts [−3.7, 1.2]) | order record |
+| `delivery_pincode` | **`address_missing` only** | weak candidate (+1.2 pts [−1.1, 3.5]) | order record |
 | `delivery_note` | `note_present`, `note_cat` (known template with digits removed, else `other`) | candidate (no signal in EDA) | order record |
 
 **Not used (Phase 2 evidence):**
@@ -57,7 +60,7 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 | `signup_date` → tenure | No signal (single-field AUC 0.504, flat across bands) **and** shifted (negative-tenure share 19% train vs 0.9% test, PSI 0.60). The service doesn't need `signup_date` |
 | `order_placed_at` → hour, weekday, festive window, season | Flat return rates (hour 11.2–11.8%, festive 11.1% vs 11.5%, Jul–Sep 11.1%) |
 | `warranty_months` | Exactly determined by family (24 months only for mixer grinders and ceiling fans) |
-| value vs list price | Exactly determined by discount and qty (order value = list × qty × (1 − discount)) |
+| value vs list price, order value as a model feature | Exactly determined by SKU, qty and discount; within a family, value tertiles show no consistent effect |
 
 ## 4. Banned columns and why
 
@@ -74,9 +77,11 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 
 1. **Target-encoding `customer_id`**, or any customer statistic computed from training labels (e.g. a customer's return rate in train, or `prior_returns` recomputed from the file). The CRM's own `customer_prior_*` columns are the only allowed history. They're as-of-order-time and already include history beyond this file.
 2. **Random-split validation.** Validation is always time-based (train on the past, validate on later months).
-3. **Tuning on the final holdout** (Apr–Jun 2026). Tuning uses walk-forward folds only.
+3. **Using the final holdout (Apr–Jun 2026) for any selection.** Every choice (ablations, `city` vs `metro`, recency weighting, hyperparameters, LR vs HGB, calibration) uses three expanding walk-forward folds: validate Jul–Sep 2025, Oct–Dec 2025 and Jan–Mar 2026, each trained on all earlier months. Apr–Jun 2026 is scored **once**, at the end, for the expected-score estimate. *(Disclosure: the Phase 2 single-field ranking was computed on Apr–Jun 2026. The drops it supported fail on all three walk-forward folds too (notebook 02 §10a), so no decision depends on the holdout.)*
 4. **Calibrating on in-sample predictions.** The calibrator is fitted on walk-forward out-of-fold predictions only.
 5. **Reporting accuracy as the headline metric.** It is shown only to explain why it misleads (base rate 11.4%).
+6. **Judging rare flags (< ~10% of orders) by single-field AUC.** Use effect size with a 95% interval instead (a rare flag can't move AUC much even when its effect is real, e.g. gift).
+7. **Post-hoc ablation rules.** The rule is fixed before Phase 4 runs: *a candidate field is kept only if it improves AUC on most walk-forward folds (≥ 2 of 3), not just on average. When results are within noise, the simpler set wins.*
 
 ## 6. Cost assumptions
 
@@ -87,7 +92,7 @@ Only these raw inputs may feed the model. Everything else is denied by default.
 | Pre-dispatch confirmation call | **₹45** per completed call | Ops-policy §4 |
 | Call effect | prevents **~35%** of returns on called orders | Ops-policy §7 (spring pilot). No dip is visible in the data (Mar–May 2026: 11.2/12.0/11.2%), so we use the policy figure |
 | Hold > 24 h | **~12%** of held orders are cancelled by the customer | Ops-policy §7 |
-| Margin lost on a cancelled good order | **open, set in Phase 5** (15 / 25 / 35% of order value, tested against the ₹375 condition) | Not in the pack |
+| Margin lost on a cancelled good order | Not in the pack; **the conclusion doesn't depend on it**: for every order worth calling, calls beat holds in every family at any margin ≥ 10% (notebook 02 §10e, `evidence/margin_crossover_15pct.csv`). Phase 5 still states the assumption used for ₹ totals | Not in the pack |
 | Model cost per order | **₹0** (local model, local reasons, no API) | Farhan's condition |
 
 ## 7. Decision rules

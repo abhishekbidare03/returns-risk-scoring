@@ -158,6 +158,72 @@ Evidence: `notebooks/02_eda.ipynb` (38 cells, executed; §9 has the summary tabl
 
 ---
 
+## Phase 2 follow-ups - before Phase 3 (2026-10-06)
+
+Evidence: `notebooks/02_eda.ipynb` §10 (56 cells, executed); `evidence/margin_crossover_15pct.csv`.
+
+**Results**
+
+*Holdout discipline.* The Phase 2 single-field AUC ranking was computed on **Apr–Jun 2026, the final holdout**. Re-run on three walk-forward folds ending Mar 2026 (Jul–Sep 25, Oct–Dec 25, Jan–Mar 26): every field dropped for lack of signal stays at coin-flip level on **all three** folds (tenure 0.49–0.51, hour 0.48–0.51, weekday 0.49–0.51, notes 0.47–0.53, address missing 0.49–0.52, tier 0.47–0.52, qty 0.50–0.51). The drops are safe because they fail on any period. Strong drivers are strong on every fold (family 0.62–0.65, payment 0.60–0.62, promised days 0.59–0.60, prior returns 0.58–0.64, Shield 0.57–0.58).
+
+*City confound.*
+| Adjusted for | Metro gap | Reading |
+|---|---|---|
+| nothing | 4.3 pts | - |
+| payment mode (COD vs prepaid) | **4.4 ± 1.2** | Not a COD proxy: COD share is the same in both tiers (30.4% vs 29.8%) |
+| promised-delivery band | **2.1 ± 1.3** | About half is delivery time: non-metro promised 5.6 vs 4.0 days; gap is **0** at 1–3 days and +7.9 at 8–12 days |
+| payment × promise × family | **1.9 ± 1.3** | Small residual location effect; interval nearly touches zero |
+
+*Order value.* Within each family, return rates are flat across SKU tiers and value tertiles (air fryer 11.8 / 12.4 / 11.8%; room heater 11.9 / 11.4 / 11.7%). There's a slight, inconsistent rise in a few families at low discount (robot vacuum 15.5 → 18.9%, but mixer grinder falls).
+
+*Rare flags (effect size, 95% interval).* **Gift: +5.5 pts [2.7, 8.3], risk ratio 1.50 [1.26, 1.78]**, the same in both training halves (17.7 vs 11.1%; 17.0 vs 10.8%), and +6.5 ± 3.0 pts after adjusting for family × payment (Apr 2025 – Mar 2026 only). Address missing +1.2 [−1.1, 3.5]; qty = 2: −1.2 [−3.7, 1.2]; discount = 0 and note `other` too rare to judge.
+
+*Margin.* Crossover risk p× (above which a call beats a hold) vs call break-even p_call, at 15% margin: median room heater p× 0.9% vs p_call 8.6%; median cooktop 0% vs 8.2%. **Worst case**, the cheapest room heater (₹880): 9.9% vs 10.0% (true accounting) or 11.7% vs 11.2% (conservative, ignoring the margin a prevented return keeps), a sliver covering 1–2 orders before any hold handling or goodwill cost. All orders: 100% (true) / 99.8–100% (conservative) at 10–25% margin. *(A first version of this check had a sign bug for expensive orders in the conservative variant (robot vacuums showed 5.9%); fixed: when call − hold is already positive at p = 0, the crossover is 0.)*
+
+**Decisions**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| **All selection on walk-forward folds ending Mar 2026; Apr–Jun 2026 scored once at the end** (policy §5.3) | Keeps the expected-score estimate honest | Keep using Apr–Jun for choices (optimistic estimate) |
+| **Ablation rule fixed in advance:** keep a candidate only if it improves AUC on ≥ 2 of 3 folds; within noise → simpler set (policy §5.7) | Prevents choosing on one lucky average | Mean-only rule (one fold can carry it) |
+| Location: candidate; **`metro` preferred over `city` if within noise**; reasons worded neutrally ("orders delivered to this area… especially with longer delivery times") | About half the gap is delivery time; the residual is small and uncertain | Present it as a customer trait; drop location without testing |
+| **Price represented once: `family` + `discount_pct`**; `order_value_inr` economics-only; SKU tier a candidate | Value = list × qty × (1 − discount); overlapping columns split one effect across LR coefficients and reasons; within-family value is flat | Order value as the feature (mixes family and discount into one number, hiding which drives the reason) |
+| **Gift = serious candidate**; rare flags judged by effect size, not AUC (policy §5.6) | Real, stable +5.5 pts effect that AUC hides at 7% prevalence | Drop gift on its AUC of 0.50–0.53 |
+| Address missing, qty: weak candidates (no evidence of an effect) | Intervals include zero | - |
+| **Margin resolved: for every order worth acting on, calls beat holds in every family at any reasonable margin (≥ 10%)** | Crossover below call break-even everywhere | Per-family caveat in the memo (no longer needed) |
+| Phase 8: if note and address features are dropped, remove `delivery_note` and `delivery_pincode` from the API inputs (privacy improvement) | Data minimisation | Accept and ignore them |
+
+**Implication for Phase 5:** under the true accounting, calling pays from p ≈ 3–9% (depending on order value), which is below the 11.4% base rate. **Call capacity, not break-even, is the binding limit**, which supports "call the top X% the team can handle".
+
+**Next step:** Phase 3, the feature pipeline (`features.py` + leakage guard + parity test).
+
+---
+
+## Phase 3 - Feature pipeline (2026-10-06)
+
+Code: `src/kestrel/features.py` (+ constants in `config.py`); tests: `tests/test_features.py`, `tests/test_data_rules.py`, `tests/conftest.py`.
+
+**Results**
+- `build_features(records, catalogue)` turns raw order records into **19 features** (7 core numeric, 2 core categorical, 6 candidate numeric, 4 candidate categorical) plus a per-row list of fallbacks. Runs in 0.24 s on all 12,600 orders.
+- On the real pack: **0 NaNs and 0 fallbacks** in train and test. Shield share 22.2%, metro share 33.5%, product age 63–1,130 days.
+- **26 tests pass** (4 s): cleaning rules C1–C4 on the real pack; no banned column is a feature or an input; **injecting leaky values (`REVERSE_PICKUP`, a pickup date, the label) leaves the features unchanged**; the feature module reads no files; fallbacks for missing Shield/city, unknown SKU and unknown payment mode; raw note text never survives (gate-code digits removed, free text → `other`); pincode `0`/`000000`/missing → `address_missing`; **train/serve parity: 150 test orders fed one at a time as JSON-like payloads give exactly the batch features.**
+
+**Decisions**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| Builder returns tidy features (numbers with NaN, categories with `"unknown"`); **encoding and imputation live in the model pipeline** | LR and HGB share one feature contract; unknown values are imputed the same way in training and serving | One-hot inside `features.py` (would tie the contract to one model type) |
+| Inputs are an explicit **allow-list** (`records.reindex(ALLOWED_INPUTS)`); anything else is dropped before any logic | Banned or unexpected fields can't leak in, whatever the caller sends | Drop a deny-list of banned names (misses new leaky fields) |
+| Unknown values are **never guessed silently**: Shield/city → NaN/`unknown` (imputed by the pipeline), unknown SKU → family from the SKU code, and each case is listed in `fallbacks` | The API must tell the employee when a score rests on less information | Fill with defaults without reporting |
+| Missing `qty` → 1, missing `is_gift` → not a gift, missing pincode → address missing | Natural defaults for optional fields | Treat as errors (would reject valid minimal orders) |
+| `state` accepted but unused | Each city maps to exactly one state (redundant) | Use state as well as city |
+| Training builds records the same way the API will (orders + `shield_member`/`city`/`state` joined from `customers.csv`) and uses the same catalogue | Single path, so parity holds by construction | Separate training feature code |
+| Product catalogue as a plain dict (`catalogue_from_products`), JSON-ready for `model_meta.json` | Service starts without `data/` | Ship `products.csv` |
+
+**Alternatives considered:** sklearn `FunctionTransformer` wrapping the builder inside the pipeline. Rejected for now because the API needs the fallback list as well as the features, and a plain function is easier to test. Revisit if Phase 8 wants a single `pipeline.predict(records)` call.
+
+**Next step:** Phase 4. `03_modeling.ipynb` on walk-forward folds ending Mar 2026: rule baseline → LR → HGB, the ablation rule fixed in policy §5.7, `metro` vs `city`, gift, recency weighting, Shield ablation, sigmoid calibration on out-of-fold predictions, the leak simulation, then Apr–Jun 2026 scored once.
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
@@ -166,3 +232,4 @@ Evidence: `notebooks/02_eda.ipynb` (38 cells, executed; §9 has the summary tabl
 | 2026-10-06 | Phase 2: new first item, pincode region vs customer city | User request; tests whether the pincode field is reliable before modelling regions |
 | 2026-10-06 | **v2.2: Phase 3 feature list revised.** Pincode region dropped (→ `city`/`metro`); tenure dropped; hour/weekday/festive dropped; `value_vs_list` and `warranty_months` dropped as redundant; weak fields → Phase 4 ablation candidates; tenure removed from the snapshot ablation | **Data contradicted the plan** (Phase 2): `440` = all 12 non-metro cities (8.4% Nagpur); tenure AUC 0.504 + PSI 0.60; hour/weekday/season flat; warranty = family; value = list × qty × (1 − discount) |
 | 2026-10-06 | Spring-pilot figures corrected to deduplicated 10.9% / 12.1% / 11.5% | Pre-work numbers included duplicate rows; conclusion unchanged |
+| 2026-10-06 | **v2.3:** selection only on walk-forward folds ending Mar 2026; ablation rule fixed in advance; metro preferred within noise; price = family + discount (order value economics-only); gift a serious candidate; §5a margin resolved; Phase 8 neutral location wording + data minimisation | User sign-off on Phase 2 + Phase 2 §10 evidence (city gap halves within delivery bands; within-family value flat; gift +5.5 pts; crossover < call break-even) |

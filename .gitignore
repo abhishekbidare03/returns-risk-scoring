@@ -2,6 +2,9 @@
 data/
 *.csv
 outputs/*.csv
+# evidence tables contain aggregates only (no rows, no IDs) - allowed
+!evidence/**/*.csv
+!evidence/*.csv
 # predictions.csv is delivered with the submission, not via any public repo
 
 # Python / tooling
