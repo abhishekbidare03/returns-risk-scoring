@@ -17,3 +17,7 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Working notes kept local only (user decision 2026-10-06)
+plan.md
+logs.md
