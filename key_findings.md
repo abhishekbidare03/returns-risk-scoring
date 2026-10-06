@@ -349,7 +349,7 @@ Evidence: **`evidence/backtest_report.md`** (the "evidence that it works, and ho
 
 **Results**
 - **Works:** ROC-AUC 0.800 / 0.770 / 0.766 on the walk-forward quarters, 0.787 on the holdout; **monthly AUC 0.741–0.821** (sd 0.029), no drift. Calibrated (deciles 1.7–40.6% predicted vs 1.3–40.7% actual). The share called per month stays at 22–28%, so the 13.7% cutoff behaves like "top ~25%".
-- **How often it's wrong (per month, operating point):** ~175 calls → ~48 to customers who would have returned, **~127 false alarms (73%)** at ₹45 each (~₹5,700/month, already in the net); **~30 returns/month (39%) not flagged**, handled as today. **10% of returns score below 5%** (cheap prepaid orders, no prior returns), the floor for any dispatch-time model.
+- **How often it's wrong (per month, operating point):** ~175 calls → ~48 to customers who would have returned, **~127 false alarms (73%)** at ₹45 each (~₹5,700/month, already in the net); **~30 returns/month (39%) not flagged**, handled as today. **10% of returns score below 5%** (cheap prepaid orders, no prior returns). These orders look like the lowest-risk orders on every field available at dispatch, so no model using this data can separate them.
 - **Segments:** new-to-model customers 0.781 vs seen 0.771 (no weakness). **No CRM history (`prior_orders = 0`): weakest, AUC 0.745 [0.704, 0.784], recall at cutoff 46% vs 66%.** Shield 0.764 vs 0.767, same calibration. Weakest families: room heater 0.724, robot vacuum 0.726. Strongest: ceiling fan 0.828, partner outlet 0.831.
 - **Gift calibration (OOF, known limitation):** gift orders **under-predicted by 7.2 pts** (10.5% vs 17.7%, ×1.69). A gift-aware score would add ~10 gift calls/month worth **~₹260/month** (~2% of policy value). Small: gifts are 7% of orders, and 22% of them are already called (precision 47%).
 - **Other calibration gaps:** robot vacuum −3.4 pts (rising return rate); partner outlet +2.7, marketplace −2.2 (channel not in the model); EMI +2.0.
@@ -369,6 +369,33 @@ Evidence: **`evidence/backtest_report.md`** (the "evidence that it works, and ho
 
 ---
 
+## Phase 7 - Predictions (2026-10-06)
+
+Code: `src/kestrel/predict.py` (`python -m kestrel.predict`); test: `tests/test_predictions.py`; evidence: **`evidence/predictions_check.md`**.
+
+**Results**
+- `outputs/predictions.csv`: **2,096 rows, one per `order_id`, same IDs and order as `sample_submission.csv`, columns `order_id, score`, no NaN, all scores in [0, 1]**. All checks PASS, and the run asserts them. No fallbacks were needed for any test order.
+- `outputs/test_scored_detail.csv` (git-ignored, like all `outputs/*.csv`): score, recommended action (CALL/SHIP) and fallbacks per order, so later checks never need a re-run.
+- **Score distribution matches the walk-forward scores:** median 0.072 vs 0.070, p90 0.261 vs 0.246, mean **11.6%** vs 11.2%; Kolmogorov–Smirnov distance **0.017 (p = 0.72)**.
+- **Share at or above the 13.7% cutoff: 25.5%** (vs the 25% assumed) → 535 calls over 92 days = **5.8 calls/day**. By month: Jul 24.3% (5.2/day), Aug 25.8% (6.1/day), Sep 26.5% (6.1/day).
+- Re-running the script reproduces identical scores. 77 tests pass.
+
+**Decisions**
+| Decision | Why | Alternative rejected |
+|---|---|---|
+| Submit the calibrated probability as `score` | Same AUC as the raw score; consistent with the API and the ₹ rule | Raw score or rank |
+| Test orders get `shield_member` joined from `customers.csv`, as the warehouse feed would pass it | Same path as training (parity) | Leave Shield unknown (would average it and lose signal) |
+| Checks recorded in a committed evidence file; predictions stay out of git | Order IDs are operational data (§10); the CSV is delivered with the submission | Commit `predictions.csv` |
+| No tabulate dependency (small markdown helper) | Keeps the install minimal | Add `tabulate` |
+
+**Expected score, ready for the submission form:**
+> **ROC-AUC 0.77–0.80 (best guess ~0.78); PR-AUC 0.34–0.42** at an ~11% return rate.
+> Why: the model was chosen on three walk-forward quarters (train on the past, score the next quarter): ROC-AUC 0.800 / 0.770 / 0.766, PR-AUC 0.42 / 0.34 / 0.38. A fourth quarter (Apr–Jun 2026) was held out and scored exactly once after every choice was frozen: ROC-AUC 0.787, PR-AUC 0.421, inside the walk-forward range, so selection didn't inflate the estimate. The range includes Jul–Sep 2025, the same season as the test quarter a year earlier (0.800). The test quarter looks like training on every model input (population stability index < 0.012 per field; Shield share 22.1% vs 22.2%), and its predicted scores match the walk-forward scores (KS 0.017, mean 11.6% vs 11.2%). PR-AUC depends on the quarter's return rate (about 3.2–3.8× it), hence its wider range. Downside risks: more customers without order history (the weakest segment, AUC 0.745), a shift in Shield status, or a season effect one year of data can't show.
+
+**Next step:** Phase 8, the service (FastAPI `POST /score` with the 7-field input, CALL/SHIP from `model_meta.json`, merged history reason, neutral wording, fallbacks; one screen; synthetic samples; runs without `data/`), then the "service behaviour" section of the report.
+
+---
+
 ## Plan changes
 
 | Date | Change | Reason |
@@ -383,3 +410,4 @@ Evidence: **`evidence/backtest_report.md`** (the "evidence that it works, and ho
 | 2026-10-06 | **v2.6:** Phase 6 adds a gift-order calibration check (OOF) as a known limitation and the history-coefficient note | User notes at Phase 4 sign-off |
 | 2026-10-06 | **v2.7:** decision stored in `model_meta.json` (`decision`); default capacity top 25% (cutoff 13.7%); API `recommended_action` = CALL at/above the cutoff, else SHIP, never HOLD; margin claim corrected (≥ 15%; 2 orders at 10%) | Phase 5 results; a Phase 5 test exposed rounding in the Phase 2 claim |
 | 2026-10-06 | **v2.8:** Phase 5 table in consistent per-month units; Phase 7 reports the test share above the 13.7% cutoff (calls/day vs the 25% assumed); Phase 6 holdout ₹ check **skipped** (Apr–Jun predictions were never saved, and re-running `03b` isn't allowed); Phase 9 scale framing | User notes at Phase 5 sign-off |
+| 2026-10-06 | **v2.9:** report made standalone (model ladder, leak table, expected-score reasons); monitors only on orders ≥ 30 days old + a measured-prevention monitor (trigger < ~15%: calls stop paying below 14.3% at the operating point); Phase 8 adds a service-behaviour section; Phase 7 saves a detail file | User notes at Phase 6 sign-off |

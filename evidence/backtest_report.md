@@ -16,15 +16,38 @@
 | **Apr–Jun 2026 (holdout, scored once)** | 2,126 | 11.5% | **0.787** | **0.421** | **44%** | **58%** |
 
 - Monthly ROC-AUC across the nine walk-forward months: **0.741–0.821** (sd 0.029), no downward drift.
-- For comparison: a two-way lookup (prior returns × Shield) scores 0.660; a constant score 0.500.
+
+**Model ladder** (walk-forward ROC-AUC, Jul–Sep 25 / Oct–Dec 25 / Jan–Mar 26; every step had to beat the previous one by ≥ 0.005 on ≥ 2 of 3 quarters, with rules fixed before running):
+
+| Step | ROC-AUC per quarter | Mean | Mean PR-AUC | Outcome |
+|---|---|---|---|---|
+| Base rate (same score for every order) | 0.500 / 0.500 / 0.500 | 0.500 | 0.112 | Floor |
+| Rule: lookup of prior returns × Shield | 0.673 / 0.649 / 0.658 | 0.660 | 0.228 | The "spreadsheet" bar |
+| **Logistic regression, 9 features** | **0.800 / 0.770 / 0.766** | **0.778** | **0.380** | **Shipped** |
+| Gradient boosting (HGB), default | 0.727 / 0.732 / 0.723 | 0.727 | 0.290 | Overfits at ~10k orders |
+| HGB, monotonic constraints + tuned (best of 24) | 0.786 / 0.760 / 0.762 | 0.769 | 0.342 | Worse than LR on every quarter → rejected (needed > +0.01) |
+| LR + any of 10 candidate fields (gift, location, channel, notes, …) | best: gift +0.005 / −0.001 / +0.004 | ≤ 0.781 | - | None passed the rule |
 - **Calibrated:** risk deciles run from 1.7% to 40.6% predicted vs 1.3% to 40.7% actual on the walk-forward folds; on the holdout, 11.0% predicted vs 11.5% actual overall, and 40.2% vs 43.7% in the top decile (`figures/03_calibration_oof.png`, `03b_calibration_holdout.png`).
 
-**Expected score on the test quarter (Jul–Sep 2026): ROC-AUC 0.77–0.80** (point estimate ~0.78), **PR-AUC 0.34–0.42** at an ~11% return rate (PR-AUC moves with the quarter's return rate, at about 3.2–3.8× it).
+**Expected score on the test quarter (Jul–Sep 2026): ROC-AUC 0.77–0.80** (point estimate ~0.78), **PR-AUC 0.34–0.42** at an ~11% return rate. Why this range:
+- it spans all four unseen quarters (three walk-forward + the holdout), including **Jul–Sep 2025, the same season a year earlier (0.800)**;
+- the holdout (0.787), scored once after every choice was frozen, sits inside the walk-forward range, so selection didn't inflate the estimate;
+- the test quarter looks like training on every model input (population stability index < 0.012 for every field; Shield share 22.1% vs 22.2%), and its scores look like the walk-forward scores (`predictions_check.md`);
+- PR-AUC moves with the quarter's return rate (about 3.2–3.8× it), hence the wider range;
+- downside risks: more customers without CRM history (the weakest segment), a shift in Shield status, or a season effect one year of history can't show.
 
 ## 2. Why "95% accuracy" was never the right bar, measured
 
 - A model that predicts "nobody returns" is **88.4–88.6% accurate**. Ours is 89.4% accurate at a 0.5 threshold, which says almost nothing about its value.
-- The same model **with the two post-dispatch columns** (service event, pickup date) scores **AUC 0.997 and 99.3% accuracy**, which is the "95%+" that was promised. Fed what the warehouse actually sees at dispatch (no pickup, `NONE`/`INSTALL_BOOKED`), it falls to **AUC 0.711**, *below* the honest model's 0.766 on the same quarter, and flags **0.05%** of orders. Those columns record the return after it happens (`03_modeling.ipynb` §8).
+- **Leak simulation** (Jan–Mar 2026 quarter, `03_modeling.ipynb` §8): the same model types trained **with** the two post-dispatch columns (service event, pickup date), then scored on the data as exported vs on what the warehouse actually sees at dispatch (no pickup; `INSTALL_BOOKED` for fans/vacuums/purifiers, `NONE` otherwise):
+
+| Model | AUC as exported | Accuracy as exported | **AUC at dispatch (real use)** | Orders flagged at 0.5, at dispatch |
+|---|---|---|---|---|
+| LR + leaky columns | 0.997 | 99.3% | **0.711** | 0.05% |
+| HGB + leaky columns | 0.995 | 99.3% | **0.681** | 0.05% |
+| **Honest model (shipped)** | - | - | **0.766** | - |
+
+The leaky model *looks* like the "95%+" that was promised, then does worse than the honest model in real use, because those columns record the return after it happens. ("Nobody returns" scores 88.4% accuracy on this quarter.)
 
 ## 3. How often it is wrong, at the operating point
 
@@ -37,7 +60,7 @@ Per month, at the export's volume (~700 orders), from the walk-forward folds:
 
 - **73% of calls are false alarms.** Each costs ₹45 and a courtesy call, already counted in the net figure (~₹5,700/month). This is acceptable *only because the action is a call*. Under a hold, each would carry a 12% cancellation risk, which is why holding the top 10% loses ~₹10,400/month while calling it earns ~₹8,300.
 - **39% of returns (~30/month) are not flagged.** They are handled exactly as today; the model adds no cost there.
-- **10% of returns get a risk below 5%** (cheap, prepaid orders from customers with no prior returns). Nothing at dispatch distinguishes them; this is the floor for any dispatch-time model.
+- **10% of returns get a risk below 5%** (cheap, prepaid orders from customers with no prior returns). These orders look like the lowest-risk orders on every field available at dispatch, so no model using this data can separate them.
 - **Value at this operating point:** ~16.7 returns avoided/month, **~₹11,400/month net (₹16,300 per 1,000 orders)**, conservative (`04_decision_economics.ipynb`).
 
 ## 4. Where it is weaker (segments, walk-forward folds)

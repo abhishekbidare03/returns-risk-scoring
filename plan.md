@@ -311,6 +311,8 @@ Contents:
 
 ### Phase 7 - Final training and `predictions.csv` (~1h)
 
+*Done 2026-10-06: `python -m kestrel.predict` → all checks PASS; 25.5% of test orders ≥ 13.7% (5.8 calls/day); see `evidence/predictions_check.md`.*
+
 1. ~~Retrain on all data~~ **Done in Phase 4** (`03b_holdout_and_final.ipynb`; `python -m kestrel.train` reproduces it). Phase 7 loads `models/model.joblib`. *(v2.5)*
 2. Apply the **sigmoid calibrator fitted on walk-forward out-of-fold predictions** (no recalibration on in-sample data).
 3. Score `test_unlabelled.csv` through the same pipeline → `outputs/predictions.csv`. **Submit the sigmoid-calibrated scores** (identical AUC to raw scores, and consistent with what the API returns).
@@ -361,6 +363,8 @@ Contents:
 - Pick a **synthetic** sample from `app/samples.json` (no real rows, no gate codes) or fill the form manually.
 - "Score" button → calls `/score` → shows the probability gauge, risk band, recommended action, reasons, ₹ expected value and any fallbacks used.
 - Delivery notes are never echoed back raw.
+
+**Report addition (v2.9):** after Phase 8, add a short **"service behaviour"** section to `evidence/backtest_report.md`: input validation, fallback cases, API test results.
 
 **Tests:** `tests/test_api.py` (valid request, missing field, banned field, unknown SKU, missing `shield_member` → fallback reported, **service starts with `data/` absent**) and the parity test from Phase 3.
 
@@ -494,5 +498,6 @@ The README says pack files go in `data/` **only for retraining** (`python -m kes
 | 2026-10-06 | v2.6 | Phase 6: gift-order calibration check on OOF predictions as a known limitation (with ₹ effect); collinearity note for history coefficients in the evidence | User notes at Phase 4 sign-off |
 | 2026-10-06 | v2.7 | Phase 5 decision stored in `model_meta.json`; default capacity top 25% (cutoff 13.7%); API action = CALL/SHIP from the stored cutoff; margin claim corrected to ≥ 15% (2 orders at 10%, below the cutoff) | Phase 5 results (`key_findings.md` Phase 5) |
 | 2026-10-06 | v2.8 | Phase 5 units fixed; Phase 6 holdout ₹ check skipped (predictions not saved; no re-run); Phase 7 cutoff-share check; Phase 9 scale framing | User notes at Phase 5 sign-off |
+| 2026-10-06 | v2.9 | Report made standalone (model ladder, leak table, expected-score reasons); monitors only on orders ≥ 30 days old + measured prevention-rate monitor; Phase 8 adds a service-behaviour section to the report; Phase 7 saves a detail file | User notes at Phase 6 sign-off |
 
 *Any later change: add a row here and a matching entry in `key_findings.md`.*
