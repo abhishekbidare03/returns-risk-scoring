@@ -468,6 +468,8 @@ Deliverable: **`memo.pdf`** (one A4 page, rendered from `memo.md` with headless 
 
 **Final version (user-supplied text, same day):** the memo was replaced with the user's exact text in team voice (no personal name), laid out as a standard business memo: "MEMORANDUM" masthead; TO / CC / FROM / DATE / SUBJECT on separate lines with bold labels; a rule under the header; black, bold, sentence-case headings; one subtle callout for the board number (*for every 100 orders we call, about 27 would otherwise have been returned, vs about 11 in 100 today; calling 1 in 4 orders reaches the orders behind 6 in 10 returns*); right-aligned numbers; no code font or file paths. It ran to two pages, so, in the order the user specified, the Shield section was cut to two sentences (last two sentences joined; numbers unchanged) and spacing was tightened. **Exactly one A4 page**, verified from the PDF's page tree. Lesson: an earlier "1 page" check had counted the *old* file, because the PDF was open in Acrobat and the print silently failed to overwrite it. The final file was compared byte-for-byte with the verified render.
 
+**Final touches:** body text enlarged to 10.75 pt (from 9.6), the largest size that keeps the full text on one A4 page (11 pt and above spill over, even with slimmer margins); header laid out as a label/value grid so the wrapped CC line stays aligned. Headings renamed to match the brief: *The decision* · *The number for the board* · *Financial impact in rupees* · *Shield customers* · *What to do next week*; step 1 now starts "This week, start a small, fair test." Still exactly one page (verified from the PDF).
+
 **Choices (earlier draft, superseded wording; the reasoning still applies)**
 | Decision | Why | Alternative rejected |
 |---|---|---|
