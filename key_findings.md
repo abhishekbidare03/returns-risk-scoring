@@ -466,7 +466,9 @@ Deliverable: **`memo.pdf`** (one A4 page, rendered from `memo.md` with headless 
 
 **Review edits (same day):** Subject line added; ₹600 case made precise (*about ₹2,900 a month calling the riskiest 15%*, from the ₹600 capacity table); step 1 notes ~3 calls a day during the half/half test; one line under the board number on how often it is wrong (*about 3 in 4 calls reach customers who would have kept the order, fine at ₹45 and exactly why holds are costly; about 4 in 10 returns aren't flagged and are handled as today*, from Phase 6: 73% / 39%); "a final three months we kept aside and checked only once". Shield section trimmed to two sentences and print margins/type tightened (11/13 mm, 9.7 pt) to keep **exactly one A4 page** (checked).
 
-**Choices**
+**Final version (user-supplied text, same day):** the memo was replaced with the user's exact text in team voice (no personal name), laid out as a standard business memo: "MEMORANDUM" masthead; TO / CC / FROM / DATE / SUBJECT on separate lines with bold labels; a rule under the header; black, bold, sentence-case headings; one subtle callout for the board number (*for every 100 orders we call, about 27 would otherwise have been returned, vs about 11 in 100 today; calling 1 in 4 orders reaches the orders behind 6 in 10 returns*); right-aligned numbers; no code font or file paths. It ran to two pages, so, in the order the user specified, the Shield section was cut to two sentences (last two sentences joined; numbers unchanged) and spacing was tightened. **Exactly one A4 page**, verified from the PDF's page tree. Lesson: an earlier "1 page" check had counted the *old* file, because the PDF was open in Acrobat and the print silently failed to overwrite it. The final file was compared byte-for-byte with the verified render.
+
+**Choices (earlier draft, superseded wording; the reasoning still applies)**
 | Decision | Why | Alternative rejected |
 |---|---|---|
 | Plain words only: no AUC, no "model", no "calibrated" | The brief says not technical | Metrics table |
