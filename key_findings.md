@@ -39,7 +39,7 @@ Informal exploration before planning. Every number here is **re-checked formally
 |---|---|---|
 | Our own code is a package (`src/kestrel`, `pyproject.toml`) installed via `-e .` inside `requirements.txt` | `pip install -r requirements.txt` alone gives a working `import kestrel` on a clean machine. API, notebooks and tests share one codebase | `sys.path` hacks in every file (fragile); separate `pip install -e .` step (one more README step that can be missed) |
 | One pinned `requirements.txt` (as planned) | Simplest clean-machine path | Separate runtime/dev files (smaller install, but more instructions) |
-| All `*.csv` git-ignored, including `outputs/predictions.csv` | Order IDs are operational data (§10). `predictions.csv` is delivered with the submission, not through a repo | Committing predictions (risk if the repo were ever public) |
+| All `*.csv` git-ignored, except `outputs/predictions.csv` | Order IDs are operational data (§10). *Changed 2026-10-07:* Kestrel asked for `predictions.csv` in the repo, so that one file (order IDs + scores only) is committed, with `.gitattributes` keeping its bytes (and SHA-256) unchanged | Committing other order-level files (`test_scored_detail.csv` stays local) |
 | Jupyter kernel registered as "Python (kestrel)" | Notebooks run on the same pinned environment as the service | Base Anaconda kernel (different versions than the shipped service) |
 
 **Notes for later phases**

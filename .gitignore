@@ -1,11 +1,12 @@
 # ops-policy §10: customer/operational data must not leave the engagement.
 data/
 *.csv
-outputs/*.csv
+
 # evidence tables contain aggregates only (no rows, no IDs) - allowed
 !evidence/**/*.csv
 !evidence/*.csv
-# predictions.csv is delivered with the submission, not via any public repo
+# predictions.csv: Kestrel asked for it in the repo (2026-10-07). Order IDs + scores only.
+!outputs/predictions.csv
 
 # Python / tooling
 .venv/

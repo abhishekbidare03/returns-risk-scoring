@@ -21,7 +21,7 @@ Runs entirely on your own machine: no API key, no external service, no AI model 
 
 | What | Where |
 |---|---|
-| Predictions for `test_unlabelled.csv` | `outputs/predictions.csv`: **not in this repository** (it contains Kestrel's order IDs); shared separately with the submission. Its checks and SHA-256 fingerprint are in [`evidence/predictions_check.md`](evidence/predictions_check.md) |
+| Predictions for `test_unlabelled.csv` | [`outputs/predictions.csv`](outputs/predictions.csv) (`order_id,score`, 2,096 rows). Its checks and SHA-256 fingerprint are in [`evidence/predictions_check.md`](evidence/predictions_check.md) |
 | Working service: one endpoint + one screen | `app/` (run it with the steps below) |
 | Evidence that it works, and how often it doesn't | [`evidence/backtest_report.md`](evidence/backtest_report.md) (start here), [`evidence/scenario_tests.md`](evidence/scenario_tests.md), [`evidence/clean_machine_test.md`](evidence/clean_machine_test.md), `notebooks/` |
 | One-page memo to Ritu | [`memo.pdf`](memo.pdf) |
@@ -187,4 +187,4 @@ tests/          154 tests
 memo.pdf        one-page memo to Ritu
 ```
 
-**Data handling (Kestrel ops-policy §10):** the raw data pack, `predictions.csv` and every file with order rows are kept out of this repository. The service, screen and sample orders contain no customer data; the samples are made up.
+**Data handling (Kestrel ops-policy §10):** the raw data pack and every file with customer or order details are kept out of this repository. The one exception is `outputs/predictions.csv` (order IDs and scores only), included because Kestrel asked for it in the repo. The service, screen and sample orders contain no customer data; the samples are made up.

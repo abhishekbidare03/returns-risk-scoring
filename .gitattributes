@@ -1,0 +1,2 @@
+# Keep predictions.csv byte-for-byte (LF) so its SHA-256 matches evidence/predictions_check.md
+outputs/predictions.csv -text
